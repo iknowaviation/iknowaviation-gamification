@@ -208,15 +208,6 @@ if ( ! function_exists( 'ika_watuproplay_get_badge_html_map' ) ) {
 }
 
 /**
- * Return [ Level Name => HTML Content ] from WATU Play levels table.
- * If your install differentiates levels vs badges, you can filter later.
- */
-function ika_watuproplay_get_level_html_map() {
-    // For now identical source; if you have a "type" column, we’ll filter.
-    return ika_watuproplay_get_badge_html_map();
-}
-
-/**
  * (Optional for later) Get level thresholds in ascending order.
  * Can be used to drive the IKA rank ladder from WatuPRO Play.
  *
