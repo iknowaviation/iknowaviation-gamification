@@ -199,7 +199,7 @@ add_action( 'admin_post_ika_gam_rebuild_leaderboard_cache', function() {
 } );
 
 add_action( 'admin_post_ika_gam_clear_transients', function() {
-    if ( ! current_user_can( 'manage_options' ) { wp_die( 'Forbidden' ); }
+    if ( ! current_user_can( 'manage_options' ) ) { wp_die( 'Forbidden' ); }
     check_admin_referer( 'ika_gam_clear_transients' );
 
     do_action( 'ika_gam_clear_transients' );
@@ -207,3 +207,4 @@ add_action( 'admin_post_ika_gam_clear_transients', function() {
     wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'tools.php?page=ika-gam-debug' ) );
     exit;
 } );
+
