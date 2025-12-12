@@ -175,30 +175,36 @@ function ika_watuproplay_get_levels() {
 /**
  * Return [ Badge Name => HTML Content ] from WATU Play levels table.
  */
-function ika_watuproplay_get_badge_html_map() {
-    global $wpdb;
+if ( ! function_exists( 'ika_watuproplay_get_badge_html_map' ) ) {
+    /**
+     * Return [ Badge Name => HTML Content ] from WATU Play levels table.
+     * Prefer the atype-based helper if available.
+     */
+    function ika_watuproplay_get_badge_html_map() {
+        if ( function_exists( 'ika_watuproplay_get_html_map_by_atype' ) ) {
+            return ika_watuproplay_get_html_map_by_atype( 'badge' );
+        }
 
-    $table = $wpdb->prefix . 'watuproplay_levels';
+        global $wpdb;
+        $table = $wpdb->prefix . 'watuproplay_levels';
 
-    // Best effort: many installs use "is_badge" or type markers.
-    // If your table has a specific column for badges, adjust the WHERE.
-    $rows = $wpdb->get_results( "SELECT name, content FROM {$table}", ARRAY_A );
-    if ( empty( $rows ) ) return array();
+        $rows = $wpdb->get_results( "SELECT name, content FROM {$table}", ARRAY_A );
+        if ( empty( $rows ) ) return array();
 
-    $out = array();
+        $out = array();
 
-    foreach ( $rows as $r ) {
-        $name = isset( $r['name'] ) ? trim( (string) $r['name'] ) : '';
-        if ( $name === '' ) continue;
+        foreach ( $rows as $r ) {
+            $name = isset( $r['name'] ) ? trim( (string) $r['name'] ) : '';
+            if ( $name === '' ) continue;
 
-        $html = isset( $r['content'] ) ? (string) $r['content'] : '';
-        // Sanitize for front-end output (admin-controlled content)
-        $html = wp_kses_post( $html );
+            $html = isset( $r['content'] ) ? (string) $r['content'] : '';
+            $html = wp_kses_post( $html );
 
-        $out[ $name ] = $html;
+            $out[ $name ] = $html;
+        }
+
+        return $out;
     }
-
-    return $out;
 }
 
 /**
