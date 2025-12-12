@@ -50,11 +50,11 @@ function ika_gam_render_debug_page() {
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
     }
 
-    $deps = array(
-        'Watu PRO'      => 'watu-pro/watu-pro.php',
-        'Watu PRO Play' => 'watu-pro-play/watu-pro-play.php',
-        'UsersWP'       => 'userswp/userswp.php',
-    );
+    $required = array(
+		'Watu PRO'      => 'watupro/watupro.php',
+		'Watu PRO Play' => 'watupro-play/watupro-play.php',
+		'UsersWP'       => 'userswp/userswp.php',
+	);
 
     $flags = function_exists( 'ika_gam_get_feature_flags' ) ? ika_gam_get_feature_flags() : array();
 
