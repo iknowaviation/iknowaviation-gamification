@@ -50,7 +50,7 @@ function ika_gam_render_debug_page() {
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
     }
 
-    $required = array(
+    $deps = array(
 		'Watu PRO'      => 'watupro/watupro.php',
 		'Watu PRO Play' => 'watupro-play/watupro-play.php',
 		'UsersWP'       => 'userswp/userswp.php',
