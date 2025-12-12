@@ -96,7 +96,8 @@ function ika_gam_render_debug_page() {
             <table class="widefat striped">
                 <thead><tr><th>Flag</th><th>Enabled</th><th>Description</th></tr></thead>
                 <tbody>
-                    <?php foreach ( ika_gam_feature_flags_defaults() as $key => $default ): ?>
+                    <?php foreach ( ( function_exists('ika_gam_feature_flags_defaults') ? ika_gam_feature_flags_defaults() : array() ) as $key => $default ): ?>
+
                         <tr>
                             <td><code><?php echo esc_html( $key ); ?></code></td>
                             <td>
