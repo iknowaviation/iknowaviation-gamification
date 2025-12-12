@@ -1,0 +1,10 @@
+# Build output
+dist/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
+
+# Node (if ever added)
+node_modules/
