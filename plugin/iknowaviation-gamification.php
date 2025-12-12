@@ -28,34 +28,42 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/feature-flags.php';
  */
 require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro-hooks-admin.php';
+
+/**
+ * Optional improvement:
+ * Gate WatuPRO-related hooks behind the XP flag so a Watu/XP subsystem issue
+ * can be turned off without taking down the whole plugin.
+ */
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'xp' ) ) {
+	require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro-hooks-admin.php';
+}
 
 /**
  * Optional modules behind flags (turn on/off in Debug Panel)
  */
-if ( ika_gam_feature_enabled( 'xp' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'xp' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro-dashboard-shortcodes.php';
 }
 
-if ( ika_gam_feature_enabled( 'streaks' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'streaks' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/streaks-status.php';
 }
 
-if ( ika_gam_feature_enabled( 'ranks' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'ranks' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/hero-metrics-shortcodes.php';
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/rank-card-shortcodes.php';
 }
 
-if ( ika_gam_feature_enabled( 'leaderboard' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'leaderboard' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/leaderboard.php';
 }
 
-if ( ika_gam_feature_enabled( 'watuplay' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'watuplay' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/watuplay-avatar-modal.php';
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/watuproplay-levels.php';
 }
 
-if ( ika_gam_feature_enabled( 'admin_tools' ) ) {
+if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'admin_tools' ) ) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-debug-panel.php';
 }
 
@@ -68,7 +76,11 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-tools-shortcodes.php';
 /**
  * Daily Missions subsystem (optional + file-exists safe)
  */
-if ( ika_gam_feature_enabled( 'missions' ) && file_exists( IKA_GAM_PLUGIN_PATH . 'includes/daily-missions.php' ) ) {
+if (
+	function_exists( 'ika_gam_feature_enabled' )
+	&& ika_gam_feature_enabled( 'missions' )
+	&& file_exists( IKA_GAM_PLUGIN_PATH . 'includes/daily-missions.php' )
+) {
 	require_once IKA_GAM_PLUGIN_PATH . 'includes/daily-missions.php';
 }
 
@@ -76,7 +88,9 @@ if ( ika_gam_feature_enabled( 'missions' ) && file_exists( IKA_GAM_PLUGIN_PATH .
  * Bootstrap hook (future use)
  */
 add_action( 'plugins_loaded', function() {
-	// Place for future setup if needed (textdomains, etc.).
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		error_log( '[IKA] Gamification Engine loaded: ' . IKA_GAM_PLUGIN_VERSION );
+	}
 } );
 
 /**
@@ -108,9 +122,10 @@ add_action( 'admin_notices', function() {
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
 	}
 
+	// IMPORTANT: These are the slugs you confirmed are correct on your site.
 	$required = array(
-		'Watu PRO'      => 'watu-pro/watu-pro.php',
-		'Watu PRO Play' => 'watu-pro-play/watu-pro-play.php',
+		'Watu PRO'      => 'watupro/watupro.php',
+		'Watu PRO Play' => 'watupro-play/watupro-play.php',
 		'UsersWP'       => 'userswp/userswp.php',
 	);
 
