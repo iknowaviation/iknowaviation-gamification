@@ -56,10 +56,19 @@ function ika_gam_feature_enabled( $key ) {
 
 /** Update a single flag (stored in WP option). */
 function ika_gam_set_feature_flag( $key, $enabled ) {
+    $defaults = ika_gam_feature_flags_defaults();
+    if ( ! isset( $defaults[ $key ] ) ) {
+        return;
+    }
+
     $saved = get_option( 'ika_gam_feature_flags', array() );
     if ( ! is_array( $saved ) ) { $saved = array(); }
 
     $saved[ $key ] = (bool) $enabled;
 
     update_option( 'ika_gam_feature_flags', $saved, false );
+}
+
+function ika_gam_feature_keys() {
+    return array_keys( ika_gam_feature_flags_defaults() );
 }
