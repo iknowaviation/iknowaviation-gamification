@@ -173,3 +173,8 @@ function ika_render_stats_rebuild_page() {
 	</div>
 	<?php
 }
+
+// Debug Panel hook: Rebuild stats (Tools → IKA Gamification Debug)
+add_action( 'ika_gam_rebuild_stats', function() {
+    ika_rebuild_stats_for_all_users();
+} );

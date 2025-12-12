@@ -50,7 +50,15 @@ add_shortcode( 'ika_leaderboard', function( $atts ) {
 		),
 	) );
 
-	$results = $users->get_results();
+	$cache_key = 'ika_leaderboard_top_' . $limit;
+	$results   = get_transient( $cache_key );
+
+	if ( false === $results ) {
+		$results = $users->get_results();
+		// Cache for 10 minutes (adjust later)
+		set_transient( $cache_key, $results, 10 * MINUTE_IN_SECONDS );
+	}
+
 	if ( empty( $results ) ) {
 		return '<div class="ika-leaderboard-empty">No pilots on the leaderboard yet.</div>';
 	}
@@ -99,3 +107,13 @@ add_shortcode( 'ika_leaderboard', function( $atts ) {
 	<?php
 	return ob_get_clean();
 });
+
+// Debug Panel hook: clear leaderboard caches
+add_action( 'ika_gam_rebuild_leaderboard_cache', function() {
+
+    // Clear a reasonable range of cached sizes you may use.
+    // Adjust if you only ever use limit=10.
+    foreach ( array( 5, 10, 15, 20, 25, 50 ) as $limit ) {
+        delete_transient( 'ika_leaderboard_top_' . $limit );
+    }
+} );
