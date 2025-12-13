@@ -72,6 +72,7 @@ if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'a
  */
 require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-menu-settings.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-tools-shortcodes.php';
+require_once IKA_GAM_PLUGIN_PATH . 'includes/tools/class-ika-watupro-importer.php';
 
 /**
  * Daily Missions subsystem (optional + file-exists safe)
