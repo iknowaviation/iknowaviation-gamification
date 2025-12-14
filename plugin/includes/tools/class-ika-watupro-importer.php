@@ -11,6 +11,7 @@
  *   - Ensures a Quiz CPT post exists and contains [watupro EXAM_ID]
  *   - Relies on your existing do_shortcode_tag wrapper filter to add:
  *     <div class="ika-quiz-page hero-jet"> ... </div>
+ * - NEW: Quiz Builder UI → generates import-ready JSON using defaults from an existing master row (e.g. quiz ID 6)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -38,6 +39,9 @@ class IKA_WatuPRO_Importer {
 		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 		add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
 		add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
+
+		// NEW: Builder JSON generator
+		add_action( 'admin_post_ika_watupro_build_json', [ __CLASS__, 'handle_builder_generate_json' ] );
 	}
 
 	public static function add_menu() {
@@ -49,8 +53,21 @@ class IKA_WatuPRO_Importer {
 			'ika-watupro-importer',
 			[ __CLASS__, 'render_page' ]
 		);
+
+		// NEW: Quiz Builder submenu
+		add_submenu_page(
+			'ika-gamification',
+			'Quiz Builder → JSON',
+			'Quiz Builder',
+			'manage_options',
+			'ika-quiz-builder',
+			[ __CLASS__, 'render_builder_page' ]
+		);
 	}
 
+	/** =========================
+	 * IMPORTER / EXPORTER PAGE
+	 * ========================= */
 	public static function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
@@ -169,11 +186,7 @@ class IKA_WatuPRO_Importer {
 					var note = document.getElementById('ika_replace_existing_note');
 					var cpt = document.getElementById('ika_cpt_enable');
 
-					if (!mode) {
-						// Helpful debug: if you ever need to confirm selector issues, uncomment:
-						// console.log('[IKA Importer] replace_mode select not found');
-						return;
-					}
+					if (!mode) return;
 
 					var value = (mode.value || '').toLowerCase();
 					var isAuto = (value === 'auto');
@@ -190,14 +203,9 @@ class IKA_WatuPRO_Importer {
 
 					// CPT auto-enable when ALL is selected
 					if (isAll && cpt) {
-						// Force both the property and attribute (covers edge cases)
 						cpt.checked = true;
 						cpt.setAttribute('checked', 'checked');
-
-						// Trigger a change event in case other scripts listen to it
-						try {
-							cpt.dispatchEvent(new Event('change', { bubbles: true }));
-						} catch (e) {}
+						try { cpt.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
 					}
 				}
 
@@ -205,12 +213,11 @@ class IKA_WatuPRO_Importer {
 					var mode = document.querySelector('select[name="replace_mode"]');
 					if (mode) {
 						mode.addEventListener('change', syncReplaceModeUI);
-						mode.addEventListener('input', syncReplaceModeUI); // extra safety
+						mode.addEventListener('input', syncReplaceModeUI);
 					}
 					syncReplaceModeUI();
 				}
 
-				// In WP admin, DOMContentLoaded is usually fine, but add a fallback too.
 				if (document.readyState === 'loading') {
 					document.addEventListener('DOMContentLoaded', bind);
 				} else {
@@ -248,6 +255,394 @@ class IKA_WatuPRO_Importer {
 			</form>
 		</div>
 		<?php
+	}
+
+	/** =========================
+	 * QUIZ BUILDER → JSON
+	 * ========================= */
+	public static function render_builder_page() {
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
+
+		// Defaults-from quiz master row (your example: 6)
+		$defaults_from = isset($_GET['defaults_from']) ? (int) $_GET['defaults_from'] : 6;
+		if ( $defaults_from <= 0 ) $defaults_from = 6;
+
+		$defaults = self::get_master_defaults_for_builder( $defaults_from );
+
+		// Pre-fill UI with defaults
+		$prefill = [
+			'name'              => '',
+			'description_html'   => (string) ($defaults['description_html'] ?? ''),
+			'final_screen_html'  => (string) ($defaults['final_screen_html'] ?? ''),
+			'topics'            => '',
+			'difficulty'        => '',
+			'audience'          => '',
+			'questions_json'    => "[]",
+			'settings'          => $defaults['settings'] ?? [],
+			'advanced_settings' => (string) ($defaults['settings']['advanced_settings'] ?? ''),
+		];
+
+		?>
+		<div class="wrap">
+			<h1>Quiz Builder → Generate Import JSON</h1>
+
+			<p>
+				This tool generates an import-ready JSON payload for your WatuPRO importer.
+				It pulls sensible defaults from an existing quiz master row (e.g. your quiz ID <code>6</code>).
+			</p>
+
+			<form method="get" action="">
+				<input type="hidden" name="page" value="ika-quiz-builder" />
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="defaults_from">Defaults from Quiz ID</label></th>
+						<td>
+							<input type="number" min="1" name="defaults_from" id="defaults_from" value="<?php echo esc_attr( $defaults_from ); ?>" />
+							<button class="button">Reload Defaults</button>
+							<p class="description">Loads defaults from <code><?php echo esc_html( self::t_master() ); ?></code> for the selected quiz ID.</p>
+						</td>
+					</tr>
+				</table>
+			</form>
+
+			<hr />
+
+			<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>">
+				<input type="hidden" name="action" value="ika_watupro_build_json" />
+				<input type="hidden" name="defaults_from" value="<?php echo esc_attr( $defaults_from ); ?>" />
+				<?php wp_nonce_field( 'ika_watupro_build_json', 'ika_builder_nonce' ); ?>
+
+				<h2>Basics</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="quiz_name">Quiz name</label></th>
+						<td>
+							<input type="text" name="quiz_name" id="quiz_name" class="regular-text" required value="<?php echo esc_attr( $prefill['name'] ); ?>" />
+							<p class="description">This becomes <code>quiz.name</code> and is used to find/create the master quiz row on import.</p>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="description_html">Description HTML</label></th>
+						<td>
+							<textarea name="description_html" id="description_html" rows="10" class="large-text code"><?php echo esc_textarea( $prefill['description_html'] ); ?></textarea>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row"><label for="final_screen_html">Final Screen HTML</label></th>
+						<td>
+							<textarea name="final_screen_html" id="final_screen_html" rows="14" class="large-text code"><?php echo esc_textarea( $prefill['final_screen_html'] ); ?></textarea>
+						</td>
+					</tr>
+				</table>
+
+				<h2>Recommendation Engine Tags</h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="topics">Topics</label></th>
+						<td>
+							<input type="text" name="topics" id="topics" class="large-text" placeholder="Comma-separated (e.g., Flight Controls, Lift, Stability)" value="<?php echo esc_attr( $prefill['topics'] ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="difficulty">Difficulty</label></th>
+						<td>
+							<input type="text" name="difficulty" id="difficulty" class="regular-text" placeholder="e.g., beginner" value="<?php echo esc_attr( $prefill['difficulty'] ); ?>" />
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="audience">Audience</label></th>
+						<td>
+							<input type="text" name="audience" id="audience" class="large-text" placeholder="Comma-separated (e.g., Enthusiast, Student Pilot)" value="<?php echo esc_attr( $prefill['audience'] ); ?>" />
+						</td>
+					</tr>
+				</table>
+
+				<h2>Settings (defaults loaded from Quiz ID <?php echo esc_html($defaults_from); ?>)</h2>
+				<table class="form-table" role="presentation">
+					<?php self::render_builder_settings_table( $prefill['settings'] ); ?>
+					<tr>
+						<th scope="row"><label for="advanced_settings">Advanced settings (serialized)</label></th>
+						<td>
+							<textarea name="advanced_settings" id="advanced_settings" rows="6" class="large-text code"><?php echo esc_textarea( $prefill['advanced_settings'] ); ?></textarea>
+							<p class="description">
+								This is the raw serialized <code>advanced_settings</code> field. Leave as-is unless you know exactly what you’re changing.
+								(We keep it here so your builder JSON can reproduce your current defaults.)
+							</p>
+						</td>
+					</tr>
+				</table>
+
+				<h2>Questions JSON</h2>
+				<p class="description">
+					Paste a JSON array of questions matching your importer schema.
+					Example: <code>[{"question_html":"...","answer_type":"radio","answers":[{"answer_html":"...","correct":1}]}]</code>
+				</p>
+				<textarea name="questions_json" id="questions_json" rows="18" class="large-text code"><?php echo esc_textarea( $prefill['questions_json'] ); ?></textarea>
+
+				<?php submit_button( 'Download Import JSON', 'primary' ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	private static function render_builder_settings_table( array $settings ) : void {
+		$fields = self::master_settings_whitelist();
+
+		foreach ( $fields as $key => $label ) {
+			$val = $settings[$key] ?? '';
+			?>
+			<tr>
+				<th scope="row"><label for="set_<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></label></th>
+				<td>
+					<?php if ( is_int($val) || $val === '0' || $val === '1' || in_array($key, ['is_active','require_login','take_again','email_taker','email_admin','randomize_questions','pull_random','show_answers','single_page','grades_by_percent','disallow_previous_button','live_result','is_scheduled','submit_always_visible','show_pagination','enable_save_button','shareable_final_screen','redirect_final_screen','takings_by_ip','reuse_default_grades','store_progress','custom_per_page','randomize_cats','no_ajax','pay_always','published_odd','delay_results','is_likert_survey','limit_reused_questions','retake_after','is_personality_quiz'], true ) ) : ?>
+						<label>
+							<input type="checkbox" name="settings[<?php echo esc_attr($key); ?>]" id="set_<?php echo esc_attr($key); ?>" value="1" <?php checked( (int)$val, 1 ); ?> />
+							<span class="description">1 = enabled, 0 = disabled</span>
+						</label>
+					<?php else : ?>
+						<input type="text" name="settings[<?php echo esc_attr($key); ?>]" id="set_<?php echo esc_attr($key); ?>" class="regular-text" value="<?php echo esc_attr( (string)$val ); ?>" />
+					<?php endif; ?>
+				</td>
+			</tr>
+			<?php
+		}
+	}
+
+	public static function handle_builder_generate_json() {
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
+
+		if ( empty($_POST['ika_builder_nonce']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash($_POST['ika_builder_nonce']) ), 'ika_watupro_build_json' ) ) {
+			wp_die( 'Invalid nonce.' );
+		}
+
+		$defaults_from = isset($_POST['defaults_from']) ? (int) $_POST['defaults_from'] : 6;
+		if ( $defaults_from <= 0 ) $defaults_from = 6;
+
+		$quiz_name = isset($_POST['quiz_name']) ? sanitize_text_field( wp_unslash($_POST['quiz_name']) ) : '';
+		if ( $quiz_name === '' ) wp_die( 'Quiz name is required.' );
+
+		$description_html  = isset($_POST['description_html']) ? wp_kses_post( wp_unslash($_POST['description_html']) ) : '';
+		$final_screen_html = isset($_POST['final_screen_html']) ? wp_kses_post( wp_unslash($_POST['final_screen_html']) ) : '';
+
+		// Tags
+		$topics_csv = isset($_POST['topics']) ? sanitize_text_field( wp_unslash($_POST['topics']) ) : '';
+		$difficulty = isset($_POST['difficulty']) ? sanitize_text_field( wp_unslash($_POST['difficulty']) ) : '';
+		$aud_csv    = isset($_POST['audience']) ? sanitize_text_field( wp_unslash($_POST['audience']) ) : '';
+
+		$topics = self::csv_to_terms( $topics_csv );
+		$aud    = self::csv_to_terms( $aud_csv );
+
+		// Settings (merge whitelist defaults from master row)
+		$defaults = self::get_master_defaults_for_builder( $defaults_from );
+		$settings = is_array($defaults['settings'] ?? null) ? $defaults['settings'] : [];
+
+		$post_settings = ( isset($_POST['settings']) && is_array($_POST['settings']) ) ? wp_unslash($_POST['settings']) : [];
+		$settings = self::merge_builder_settings( $settings, $post_settings );
+
+		// advanced_settings (raw)
+		$advanced_settings = isset($_POST['advanced_settings']) ? (string) wp_unslash($_POST['advanced_settings']) : '';
+		if ( $advanced_settings !== '' ) {
+			$settings['advanced_settings'] = $advanced_settings;
+		}
+
+		// Questions JSON
+		$questions_raw = isset($_POST['questions_json']) ? (string) wp_unslash($_POST['questions_json']) : '[]';
+		$questions = json_decode( $questions_raw, true );
+		if ( ! is_array($questions) ) {
+			wp_die( 'Questions JSON must be a valid JSON array.' );
+		}
+
+		// Validate questions structure with the same strict validator used by importer
+		$tmp = [
+			'quiz' => [ 'name' => $quiz_name ],
+			'questions' => $questions,
+		];
+		self::validate_payload( $tmp );
+
+		$payload = [
+			'quiz' => [
+				'name'              => $quiz_name,
+				'description_html'  => $description_html,
+				'final_screen_html' => $final_screen_html,
+				// leave empty; importer auto-clears when questions exist anyway
+				'reuse_questions_from' => '',
+				'settings' => $settings,
+			],
+			'questions' => $questions,
+		];
+
+		// Include tags only if provided
+		$tag_block = [];
+		if ( ! empty($topics) ) $tag_block['topics'] = $topics;
+		if ( $difficulty !== '' ) $tag_block['difficulty'] = $difficulty;
+		if ( ! empty($aud) ) $tag_block['audience'] = $aud;
+
+		if ( ! empty($tag_block) ) {
+			$payload['tags'] = $tag_block;
+		}
+
+		$json = wp_json_encode( $payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		$filename = 'ika-quiz-' . sanitize_file_name( $quiz_name ) . '-import.json';
+
+		nocache_headers();
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		echo $json;
+		exit;
+	}
+
+	private static function csv_to_terms( string $csv ) : array {
+		$csv = trim($csv);
+		if ( $csv === '' ) return [];
+		$parts = array_map( 'trim', explode(',', $csv ) );
+		$parts = array_filter( $parts, function($v){ return $v !== ''; } );
+		return array_values( $parts );
+	}
+
+	private static function merge_builder_settings( array $base, array $incoming ) : array {
+		$allowed = array_keys( self::master_settings_whitelist() );
+
+		foreach ( $allowed as $k ) {
+			if ( ! array_key_exists( $k, $incoming ) ) {
+				// If checkbox-type key isn't present, treat as 0 (unchecked),
+				// but ONLY for known boolean-ish keys.
+				if ( self::is_boolish_master_key( $k ) ) {
+					$base[$k] = 0;
+				}
+				continue;
+			}
+
+			$v = $incoming[$k];
+
+			// Checkbox posts '1' as string
+			if ( self::is_boolish_master_key( $k ) ) {
+				$base[$k] = (int) ( (string)$v === '1' );
+			} else {
+				$base[$k] = is_scalar($v) ? (string)$v : '';
+			}
+		}
+
+		return $base;
+	}
+
+	private static function is_boolish_master_key( string $key ) : bool {
+		return in_array($key, [
+			'is_active','require_login','take_again','email_taker','email_admin',
+			'randomize_questions','pull_random','show_answers','single_page',
+			'grades_by_percent','disallow_previous_button','live_result','is_scheduled',
+			'submit_always_visible','show_pagination','enable_save_button',
+			'shareable_final_screen','redirect_final_screen','takings_by_ip',
+			'reuse_default_grades','store_progress','custom_per_page','randomize_cats',
+			'no_ajax','pay_always','published_odd','delay_results','is_likert_survey',
+			'limit_reused_questions','retake_after','is_personality_quiz'
+		], true);
+	}
+
+	/**
+	 * Safe whitelist of master-row settings you want to treat as defaults (seeded from quiz ID 6)
+	 * This is the bridge between your "full master table row" reality and your importer JSON.
+	 */
+	private static function master_settings_whitelist() : array {
+		return [
+			// Common flags
+			'is_active'                => 'is_active',
+			'require_login'            => 'require_login',
+			'take_again'               => 'take_again',
+			'email_taker'              => 'email_taker',
+			'email_admin'              => 'email_admin',
+			'randomize_questions'      => 'randomize_questions',
+			'login_mode'               => 'login_mode',
+			'time_limit'               => 'time_limit',
+			'pull_random'              => 'pull_random',
+			'show_answers'             => 'show_answers',
+			'single_page'              => 'single_page',
+			'mode'                     => 'mode',
+			'require_captcha'          => 'require_captcha',
+			'grades_by_percent'        => 'grades_by_percent',
+			'admin_email'              => 'admin_email',
+			'disallow_previous_button' => 'disallow_previous_button',
+			'email_output'             => 'email_output',
+			'live_result'              => 'live_result',
+			'gradecat_design'          => 'gradecat_design',
+			'is_scheduled'             => 'is_scheduled',
+			'schedule_from'            => 'schedule_from',
+			'schedule_to'              => 'schedule_to',
+			'submit_always_visible'    => 'submit_always_visible',
+			'show_pagination'          => 'show_pagination',
+			'advanced_settings'        => 'advanced_settings',
+			'enable_save_button'       => 'enable_save_button',
+			'shareable_final_screen'   => 'shareable_final_screen',
+			'redirect_final_screen'    => 'redirect_final_screen',
+
+			// Some of your other defaults
+			'editor_id'                => 'editor_id',
+			'takings_by_ip'            => 'takings_by_ip',
+			'reuse_default_grades'     => 'reuse_default_grades',
+			'store_progress'           => 'store_progress',
+			'custom_per_page'          => 'custom_per_page',
+			'randomize_cats'           => 'randomize_cats',
+			'no_ajax'                  => 'no_ajax',
+			'email_subject'            => 'email_subject',
+			'pay_always'               => 'pay_always',
+			'published_odd'            => 'published_odd',
+			'published_odd_url'        => 'published_odd_url',
+			'delay_results'            => 'delay_results',
+			'delay_results_date'       => 'delay_results_date',
+			'delay_results_content'    => 'delay_results_content',
+			'is_likert_survey'         => 'is_likert_survey',
+			'tags'                     => 'tags',
+			'thumb'                    => 'thumb',
+			'limit_reused_questions'   => 'limit_reused_questions',
+			'retake_after'             => 'retake_after',
+			'is_personality_quiz'      => 'is_personality_quiz',
+		];
+	}
+
+	private static function get_master_defaults_for_builder( int $quiz_id ) : array {
+		global $wpdb;
+		$tm = self::t_master();
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM {$tm} WHERE ID = %d", $quiz_id ),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			// Fall back to conservative defaults if the ID isn't found.
+			return [
+				'description_html'  => '',
+				'final_screen_html' => '',
+				'settings' => [
+					'is_active'           => 1,
+					'require_login'       => 1,
+					'take_again'          => 0,
+					'randomize_questions' => 1,
+					'single_page'         => 0,
+					'login_mode'          => '',
+					'mode'                => 'live',
+				],
+			];
+		}
+
+		$settings = [];
+		foreach ( self::master_settings_whitelist() as $key => $label ) {
+			if ( array_key_exists( $key, $row ) ) {
+				// Preserve raw strings for non-boolish fields; cast boolish to int
+				if ( self::is_boolish_master_key( $key ) ) {
+					$settings[$key] = (int) $row[$key];
+				} else {
+					$settings[$key] = (string) $row[$key];
+				}
+			}
+		}
+
+		return [
+			'description_html'  => (string) ($row['description'] ?? ''),
+			'final_screen_html' => (string) ($row['final_screen'] ?? ''),
+			'settings'          => $settings,
+		];
 	}
 
 	/** =========================
@@ -327,7 +722,6 @@ class IKA_WatuPRO_Importer {
 						$log[] = '[Dry Run] Would insert new quiz master row.';
 					}
 				} else {
-					// tags/cpt-only modes with no existing quiz
 					$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
 				}
 			}
@@ -374,9 +768,7 @@ class IKA_WatuPRO_Importer {
 				}
 
 			} else {
-				// No question changes in this mode (prevents accidental duplicates)
 				if ( $plan['touch_questions'] ) {
-					// touch_questions true but quiz missing or mode prevented replace; keep log for clarity
 					$log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
 				} else {
 					$log[] = "No question changes in mode '{$replace_mode}'.";
@@ -426,7 +818,6 @@ class IKA_WatuPRO_Importer {
 				? "Dry run complete. Mode={$replace_mode}."
 				: "Import complete. Mode={$replace_mode}.";
 
-			// Add useful counts when questions were part of the plan
 			if ( $plan['replace_questions'] ) {
 				$msg .= $is_dry
 					? " Would import {$q_count} questions and {$a_count} answers."
@@ -471,14 +862,13 @@ class IKA_WatuPRO_Importer {
 	}
 
 	private static function replace_plan( string $mode, bool $cpt_enable ) : array {
-		// Keep this conservative and explicit.
 		$plan = [
-			'needs_exam'        => false, // whether we should create master if missing
-			'update_master'     => false, // update master settings
-			'replace_questions' => false, // delete + insert Q/A
-			'touch_questions'   => false, // mode cares about questions at all
-			'sync_cpt'          => false, // CPT upsert + health check
-			'apply_tags'        => false, // CPT taxonomies
+			'needs_exam'        => false,
+			'update_master'     => false,
+			'replace_questions' => false,
+			'touch_questions'   => false,
+			'sync_cpt'          => false,
+			'apply_tags'        => false,
 		];
 
 		switch ( $mode ) {
@@ -498,28 +888,27 @@ class IKA_WatuPRO_Importer {
 				break;
 
 			case 'questions':
-				$plan['needs_exam']        = true; // quiz must exist; we also allow create if missing
+				$plan['needs_exam']        = true;
 				$plan['replace_questions'] = true;
 				$plan['touch_questions']   = true;
 				$plan['sync_cpt']          = $cpt_enable;
 				break;
 
 			case 'tags':
-				$plan['needs_exam']        = false; // do not create master in tags-only mode
-				$plan['sync_cpt']          = $cpt_enable; // we need a CPT post to tag
+				$plan['needs_exam']        = false;
+				$plan['sync_cpt']          = $cpt_enable;
 				$plan['apply_tags']        = true;
 				break;
 
 			case 'cpt':
-				$plan['needs_exam']        = false; // do not create master in CPT-only mode
+				$plan['needs_exam']        = false;
 				$plan['sync_cpt']          = $cpt_enable;
 				break;
 
 			case 'none':
 			default:
-				// Safe default: no Q/A changes, but do update master and CPT linkage if enabled.
-				$plan['needs_exam']        = true;     // create quiz if missing
-				$plan['update_master']     = true;     // update settings/title/desc/final
+				$plan['needs_exam']        = true;
+				$plan['update_master']     = true;
 				$plan['sync_cpt']          = $cpt_enable;
 				break;
 		}
@@ -529,22 +918,18 @@ class IKA_WatuPRO_Importer {
 
 	/** =========================
 	 * MODE-AWARE VALIDATION
-	 * (keeps validate_payload() unchanged)
 	 * ========================= */
 	private static function validate_payload_by_mode( array $data, string $replace_mode ) : void {
-		// Always require quiz object + name
 		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
 		if ( empty( $data['quiz']['name'] ) ) throw new Exception( 'Missing quiz.name.' );
 
-		// Only require questions for modes that touch questions
 		$needs_questions = in_array( $replace_mode, [ 'all', 'questions' ], true );
 
 		if ( $needs_questions ) {
-			self::validate_payload( $data ); // strict original validator
+			self::validate_payload( $data );
 			return;
 		}
 
-		// For non-question modes, questions can be missing or empty.
 		if ( array_key_exists( 'questions', $data ) && ! is_array( $data['questions'] ) ) {
 			throw new Exception( '"questions" must be an array when provided.' );
 		}
@@ -556,7 +941,6 @@ class IKA_WatuPRO_Importer {
 	private static function apply_quiz_tags( int $post_id, array $tags, array &$log ) : void {
 		if ( ! $post_id ) return;
 
-		// topics: array
 		if ( isset($tags['topics']) && is_array($tags['topics']) ) {
 			if ( taxonomy_exists( self::TAX_TOPIC ) ) {
 				wp_set_object_terms( $post_id, array_values($tags['topics']), self::TAX_TOPIC, false );
@@ -566,7 +950,6 @@ class IKA_WatuPRO_Importer {
 			}
 		}
 
-		// difficulty: string
 		if ( isset($tags['difficulty']) && $tags['difficulty'] !== '' ) {
 			if ( taxonomy_exists( self::TAX_DIFFICULTY ) ) {
 				wp_set_object_terms( $post_id, [ (string)$tags['difficulty'] ], self::TAX_DIFFICULTY, false );
@@ -576,7 +959,6 @@ class IKA_WatuPRO_Importer {
 			}
 		}
 
-		// audience: array
 		if ( isset($tags['audience']) && is_array($tags['audience']) ) {
 			if ( taxonomy_exists( self::TAX_AUDIENCE ) ) {
 				wp_set_object_terms( $post_id, array_values($tags['audience']), self::TAX_AUDIENCE, false );
@@ -588,9 +970,8 @@ class IKA_WatuPRO_Importer {
 	}
 
 	/** =========================
-	 * ORIGINAL HELPERS (UNCHANGED)
+	 * ORIGINAL HELPERS
 	 * ========================= */
-
 	private static function validate_payload( array $data ) {
 		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
 		if ( empty( $data['quiz']['name'] ) ) throw new Exception( 'Missing quiz.name.' );
@@ -650,19 +1031,16 @@ class IKA_WatuPRO_Importer {
 		$settings = ( isset( $quiz['settings'] ) && is_array( $quiz['settings'] ) ) ? $quiz['settings'] : [];
 
 		$row = [
-			'name'                => sanitize_text_field( (string) $quiz['name'] ),
-			'description'         => $desc,
-			'final_screen'        => $final,
-			'added_on'            => current_time( 'mysql' ),
-			'is_active'           => isset($settings['is_active']) ? (int)$settings['is_active'] : 1,
-			'require_login'       => isset($settings['require_login']) ? (int)$settings['require_login'] : 0,
-			'take_again'          => isset($settings['take_again']) ? (int)$settings['take_again'] : 0,
-			'randomize_questions' => isset($settings['randomize_questions']) ? (int)$settings['randomize_questions'] : 0,
-			'single_page'         => isset($settings['single_page']) ? (int)$settings['single_page'] : 0,
-			'login_mode'          => isset($settings['login_mode']) ? sanitize_text_field((string)$settings['login_mode']) : 'open',
-			'mode'                => isset($settings['mode']) ? sanitize_text_field((string)$settings['mode']) : 'live',
+			'name'         => sanitize_text_field( (string) $quiz['name'] ),
+			'description'  => $desc,
+			'final_screen' => $final,
+			'added_on'     => current_time( 'mysql' ),
 		];
 
+		// Apply whitelisted master fields from settings (safe)
+		$row = array_merge( $row, self::settings_to_master_row_whitelist( $settings ) );
+
+		// reuse_questions_from may be passed at quiz root or inside settings
 		if ( isset($quiz['reuse_questions_from']) ) {
 			$row['reuse_questions_from'] = sanitize_text_field( (string) $quiz['reuse_questions_from'] );
 		} elseif ( isset($settings['reuse_questions_from']) ) {
@@ -691,11 +1069,8 @@ class IKA_WatuPRO_Importer {
 		if ( $desc !== null ) $update['description'] = $desc;
 		if ( $final !== null ) $update['final_screen'] = $final;
 
-		foreach ( [ 'is_active','require_login','take_again','randomize_questions','single_page' ] as $k ) {
-			if ( array_key_exists( $k, $settings ) ) $update[$k] = (int) $settings[$k];
-		}
-		if ( array_key_exists( 'login_mode', $settings ) ) $update['login_mode'] = sanitize_text_field((string)$settings['login_mode']);
-		if ( array_key_exists( 'mode', $settings ) ) $update['mode'] = sanitize_text_field((string)$settings['mode']);
+		// Apply whitelisted master fields from settings (safe)
+		$update = array_merge( $update, self::settings_to_master_row_whitelist( $settings ) );
 
 		if ( array_key_exists( 'reuse_questions_from', $quiz ) ) {
 			$update['reuse_questions_from'] = sanitize_text_field((string)$quiz['reuse_questions_from']);
@@ -712,6 +1087,26 @@ class IKA_WatuPRO_Importer {
 		if ( $ok === false ) throw new Exception( 'Update quiz failed: ' . $wpdb->last_error );
 
 		$log[] = "Updated quiz master row ID={$quiz_id}.";
+	}
+
+	private static function settings_to_master_row_whitelist( array $settings ) : array {
+		$out = [];
+
+		// Only write fields that truly exist in master table AND are in our whitelist mapping.
+		foreach ( self::master_settings_whitelist() as $k => $_label ) {
+			if ( ! array_key_exists( $k, $settings ) ) continue;
+
+			$v = $settings[$k];
+
+			if ( self::is_boolish_master_key( $k ) ) {
+				$out[$k] = (int) ( (string)$v === '1' || (int)$v === 1 );
+			} else {
+				// preserve raw strings for fields like admin_email, email_output, gradecat_design, advanced_settings, etc.
+				$out[$k] = is_scalar($v) ? (string)$v : '';
+			}
+		}
+
+		return $out;
 	}
 
 	private static function delete_quiz_children( int $quiz_id, array &$log ) {
@@ -797,11 +1192,8 @@ class IKA_WatuPRO_Importer {
 		}
 
 		$title = sanitize_text_field( (string) $quiz['name'] );
-
-		// Canonical content: let your wrapper filter do the <div class="ika-quiz-page hero-jet"> wrapper.
 		$content = '[watupro ' . (int) $exam_id . ']';
 
-		// 1) Find by meta link first
 		$existing = get_posts([
 			'post_type'      => $post_type,
 			'post_status'    => 'any',
@@ -813,7 +1205,6 @@ class IKA_WatuPRO_Importer {
 			'fields'         => 'ids',
 		]);
 
-		// 2) Fallback: exact title match to prevent duplicates if older posts lacked meta
 		if ( empty( $existing ) ) {
 			$title_match = get_posts([
 				'post_type'      => $post_type,
@@ -825,7 +1216,6 @@ class IKA_WatuPRO_Importer {
 				'fields'         => 'ids',
 			]);
 
-			// Ensure exact match if we got a result
 			if ( ! empty( $title_match ) ) {
 				$candidate_id = (int) $title_match[0];
 				$candidate_title = get_the_title( $candidate_id );
@@ -840,7 +1230,7 @@ class IKA_WatuPRO_Importer {
 			'post_type'    => $post_type,
 			'post_title'   => $title,
 			'post_status'  => 'publish',
-			'post_content' => $content, // force content so shortcode wrapper filter always runs
+			'post_content' => $content,
 		];
 
 		if ( ! empty( $existing ) ) {
@@ -982,6 +1372,14 @@ class IKA_WatuPRO_Importer {
 			];
 		}
 
+		// Export settings using the same whitelist keys to keep builder/import aligned
+		$settings = [];
+		foreach ( self::master_settings_whitelist() as $k => $_label ) {
+			if ( array_key_exists( $k, $master ) ) {
+				$settings[$k] = self::is_boolish_master_key($k) ? (int)$master[$k] : (string)$master[$k];
+			}
+		}
+
 		return [
 			'quiz' => [
 				'name'                   => $master['name'],
@@ -989,15 +1387,7 @@ class IKA_WatuPRO_Importer {
 				'final_screen_html'      => $master['final_screen'],
 				'reuse_questions_from'   => $master['reuse_questions_from'],
 				'_export_source_exam_id' => $source_quiz_id,
-				'settings' => [
-					'is_active'           => (int) $master['is_active'],
-					'require_login'       => (int) $master['require_login'],
-					'take_again'          => (int) $master['take_again'],
-					'randomize_questions' => (int) $master['randomize_questions'],
-					'single_page'         => (int) $master['single_page'],
-					'login_mode'          => (string) $master['login_mode'],
-					'mode'                => (string) $master['mode'],
-				],
+				'settings'               => $settings,
 			],
 			'questions'    => $out_questions,
 			'_export_note' => $export_note,
