@@ -3,15 +3,14 @@
  * IKA WatuPRO Quiz Importer + Exporter (JSON)
  * - Import quizzes/questions/answers/explanations into WatuPRO tables
  * - Dry Run supported
- * - Optional: Replace existing questions/answers for an existing quiz
+ * - Selective Replace Modes (hardening)
  * - Export existing quiz to JSON (round-trip compatible)
  * - Handles "reuse questions" quizzes by exporting questions from reuse source exam_id
- * - IMPORTANT: Auto-clears reuse_questions_from whenever questions are provided on import
- * - Optional: Create/Update a Quiz CPT post and link via post meta
- *
- * SECURITY:
- * - Admin-only
- * - Nonce protected
+ * - Auto-clears reuse_questions_from whenever questions are provided on import
+ * - CPT integration:
+ *   - Ensures a Quiz CPT post exists and contains [watupro EXAM_ID]
+ *   - Relies on your existing do_shortcode_tag wrapper filter to add:
+ *     <div class="ika-quiz-page hero-jet"> ... </div>
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,11 +18,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class IKA_WatuPRO_Importer {
 
 	/** =========================
-	 * CONFIG (adjust if needed)
+	 * CONFIG
 	 * ========================= */
-	const CPT_POST_TYPE          = 'quiz'; // Your CPT slug (confirmed)
+	const CPT_POST_TYPE          = 'quiz';
 	const CPT_META_EXAM_ID       = '_ika_watupro_exam_id';
 	const CPT_META_IMPORT_HASH   = '_ika_watupro_import_hash';
+
+	// Optional taxonomies for recommendation engine tagging (CPT-level)
+	const TAX_TOPIC              = 'ika_topic';
+	const TAX_DIFFICULTY         = 'ika_difficulty';
+	const TAX_AUDIENCE           = 'ika_audience';
 
 	// Your table names (from your SQL dump)
 	private static function t_master()   { return 'wp_2cd0c0f1b0_watupro_master'; }
@@ -32,17 +36,13 @@ class IKA_WatuPRO_Importer {
 
 	public static function init() {
 		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
-
-		// Import handler
 		add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
-
-		// Export handler
 		add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
 	}
 
 	public static function add_menu() {
 		add_submenu_page(
-			'ika-gamification', // parent slug (adjust ONLY if your parent menu slug differs)
+			'ika-gamification',
 			'WatuPRO Importer',
 			'WatuPRO Importer',
 			'manage_options',
@@ -52,9 +52,7 @@ class IKA_WatuPRO_Importer {
 	}
 
 	public static function render_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( 'Insufficient permissions.' );
-		}
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
 		$last = get_transient( 'ika_watupro_import_last_result' );
 		delete_transient( 'ika_watupro_import_last_result' );
@@ -63,7 +61,6 @@ class IKA_WatuPRO_Importer {
 		delete_transient( 'ika_watupro_export_last_result' );
 
 		$quizzes = self::list_quizzes();
-
 		?>
 		<div class="wrap">
 			<h1>WatuPRO Importer / Exporter (JSON)</h1>
@@ -89,7 +86,7 @@ class IKA_WatuPRO_Importer {
 			<hr />
 
 			<h2>Import JSON</h2>
-			<p><strong>Tip:</strong> Run Dry Run first. Then Import. If you enable “Replace existing,” it deletes existing questions/answers for that quiz (matched by exact quiz name).</p>
+			<p><strong>Tip:</strong> Run Dry Run first. Then Import.</p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
 				<input type="hidden" name="action" value="ika_watupro_import" />
@@ -116,12 +113,33 @@ class IKA_WatuPRO_Importer {
 					</tr>
 
 					<tr>
-						<th scope="row">Replace existing?</th>
+						<th scope="row">Selective Replace Mode</th>
+						<td>
+							<select name="replace_mode">
+								<option value="auto" selected>Auto (safe default)</option>
+								<option value="none">None (no Q/A changes)</option>
+								<option value="all">All (settings + replace Q/A)</option>
+								<option value="settings">Settings only (no Q/A changes)</option>
+								<option value="questions">Questions only (replace Q/A only)</option>
+								<option value="tags">Tags only (CPT taxonomies only)</option>
+								<option value="cpt">CPT only (enforce post + shortcode)</option>
+							</select>
+							<p class="description">
+								<strong>Auto</strong> uses the legacy checkbox below: if “Replace existing” is checked → All; otherwise → None.
+							</p>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">Legacy: Replace existing?</th>
 						<td>
 							<label>
-								<input type="checkbox" name="replace_existing" value="1" />
-								If quiz exists (by exact name), delete its existing questions/answers and re-import
+								<input type="checkbox" name="replace_existing" id="ika_replace_existing" value="1" />
+								Legacy toggle (Auto mode only): If quiz exists (by exact name), delete its existing questions/answers and re-import
 							</label>
+							<p class="description" id="ika_replace_existing_note" style="margin-top:6px;">
+								Disabled unless <strong>Selective Replace Mode</strong> is set to <strong>Auto</strong>.
+							</p>
 						</td>
 					</tr>
 
@@ -129,18 +147,77 @@ class IKA_WatuPRO_Importer {
 						<th scope="row">CPT integration</th>
 						<td>
 							<label>
-								<input type="checkbox" name="cpt_enable" value="1" checked />
-								Create/Update a Quiz CPT post and link it (meta: <code><?php echo esc_html(self::CPT_META_EXAM_ID); ?></code>)
+								<input type="checkbox" name="cpt_enable" id="ika_cpt_enable" value="1" checked />
+								Create/Update a Quiz CPT post and link it (post content forced to <code>[watupro EXAM_ID]</code>)
 							</label>
 							<p class="description">
-								CPT slug configured as <code><?php echo esc_html(self::CPT_POST_TYPE); ?></code>.
+								Your wrapper filter will wrap output in <code>&lt;div class="ika-quiz-page hero-jet"&gt;...&lt;/div&gt;</code> on single quiz CPT pages.
 							</p>
 						</td>
 					</tr>
+
 				</table>
 
 				<?php submit_button( 'Run Import' ); ?>
 			</form>
+
+			<script>
+			(function(){
+				function syncReplaceModeUI() {
+					var mode = document.querySelector('select[name="replace_mode"]');
+					var legacy = document.getElementById('ika_replace_existing');
+					var note = document.getElementById('ika_replace_existing_note');
+					var cpt = document.getElementById('ika_cpt_enable');
+
+					if (!mode) {
+						// Helpful debug: if you ever need to confirm selector issues, uncomment:
+						// console.log('[IKA Importer] replace_mode select not found');
+						return;
+					}
+
+					var value = (mode.value || '').toLowerCase();
+					var isAuto = (value === 'auto');
+					var isAll  = (value === 'all');
+
+					// Legacy checkbox logic (Auto only)
+					if (legacy) {
+						legacy.disabled = !isAuto;
+						if (!isAuto) legacy.checked = false;
+					}
+					if (note) {
+						note.style.opacity = isAuto ? '1' : '0.65';
+					}
+
+					// CPT auto-enable when ALL is selected
+					if (isAll && cpt) {
+						// Force both the property and attribute (covers edge cases)
+						cpt.checked = true;
+						cpt.setAttribute('checked', 'checked');
+
+						// Trigger a change event in case other scripts listen to it
+						try {
+							cpt.dispatchEvent(new Event('change', { bubbles: true }));
+						} catch (e) {}
+					}
+				}
+
+				function bind() {
+					var mode = document.querySelector('select[name="replace_mode"]');
+					if (mode) {
+						mode.addEventListener('change', syncReplaceModeUI);
+						mode.addEventListener('input', syncReplaceModeUI); // extra safety
+					}
+					syncReplaceModeUI();
+				}
+
+				// In WP admin, DOMContentLoaded is usually fine, but add a fallback too.
+				if (document.readyState === 'loading') {
+					document.addEventListener('DOMContentLoaded', bind);
+				} else {
+					bind();
+				}
+			})();
+			</script>
 
 			<hr />
 
@@ -183,13 +260,19 @@ class IKA_WatuPRO_Importer {
 			wp_die( 'Invalid nonce.' );
 		}
 
-		$mode = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'dry';
+		$mode   = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'dry';
 		$is_dry = ( $mode !== 'import' );
 
 		$replace_existing = ! empty( $_POST['replace_existing'] );
-		$cpt_enable = ! empty( $_POST['cpt_enable'] );
+		$cpt_enable       = ! empty( $_POST['cpt_enable'] );
+
+		$raw_replace_mode = isset( $_POST['replace_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['replace_mode'] ) ) : 'auto';
+		$replace_mode     = self::normalize_replace_mode( $raw_replace_mode, $replace_existing );
+
+		$plan = self::replace_plan( $replace_mode, $cpt_enable );
 
 		$log = [];
+		$log[] = "Replace mode: {$replace_mode}";
 
 		try {
 			if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) throw new Exception( 'No file uploaded.' );
@@ -200,18 +283,16 @@ class IKA_WatuPRO_Importer {
 			$data = json_decode( $raw, true );
 			if ( ! is_array( $data ) ) throw new Exception( 'Invalid JSON.' );
 
-			// Normalize common wrappers/case so import is resilient
-			if ( isset($data['data']) && is_array($data['data']) )         $data = $data['data'];
-			if ( isset($data['payload']) && is_array($data['payload']) )   $data = $data['payload'];
-			if ( ! isset($data['questions']) && isset($data['Questions']) ) $data['questions'] = $data['Questions'];
-			if ( ! isset($data['quiz']) && isset($data['Quiz']) )           $data['quiz'] = $data['Quiz'];
+			// Normalize wrappers/case
+			if ( isset($data['data']) && is_array($data['data']) )           $data = $data['data'];
+			if ( isset($data['payload']) && is_array($data['payload']) )     $data = $data['payload'];
+			if ( ! isset($data['questions']) && isset($data['Questions']) )  $data['questions'] = $data['Questions'];
+			if ( ! isset($data['quiz']) && isset($data['Quiz']) )            $data['quiz'] = $data['Quiz'];
 
-			self::validate_payload( $data );
+			// Mode-aware validation (keeps validate_payload() unchanged)
+			self::validate_payload_by_mode( $data, $replace_mode );
 
-			/**
-			 * IMPORTANT: Auto-clear reuse_questions_from whenever questions are provided.
-			 * If you're importing actual questions/answers, this quiz should NOT remain a "reuse" shell.
-			 */
+			// Auto-clear reuse_questions_from whenever questions are provided on import (even if mode won't apply them)
 			$has_questions = is_array($data['questions']) && count($data['questions']) > 0;
 			if ( $has_questions ) {
 				$data['quiz']['reuse_questions_from'] = '';
@@ -222,71 +303,119 @@ class IKA_WatuPRO_Importer {
 			}
 
 			global $wpdb;
-
 			if ( ! $is_dry ) $wpdb->query( 'START TRANSACTION' );
 
-			$quiz = $data['quiz'];
+			$quiz      = $data['quiz'];
 			$quiz_name = trim( (string) $quiz['name'] );
-			$log[] = 'Quiz name: ' . $quiz_name;
+			$log[]     = 'Quiz name: ' . $quiz_name;
 
 			$quiz_id = self::find_quiz_id_by_name( $quiz_name );
 
 			if ( $quiz_id ) {
 				$log[] = "Existing quiz found (ID={$quiz_id}).";
-				if ( $replace_existing ) {
-					$log[] = "Replace enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
-					if ( ! $is_dry ) self::delete_quiz_children( (int) $quiz_id, $log );
-					else $log[] = '[Dry Run] Would delete existing questions/answers.';
-				}
-
-				if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
-				else $log[] = '[Dry Run] Would update quiz master row.';
 			} else {
-				$log[] = "No existing quiz found. Will create new quiz.";
-				if ( ! $is_dry ) $quiz_id = self::insert_master( $quiz, $log );
-				else {
-					$quiz_id = 0;
-					$log[] = '[Dry Run] Would insert new quiz master row.';
+				$log[] = "No existing quiz found.";
+			}
+
+			// Ensure quiz master exists if needed by plan
+			if ( ! $quiz_id ) {
+				if ( $plan['needs_exam'] ) {
+					if ( ! $is_dry ) {
+						$quiz_id = self::insert_master( $quiz, $log );
+					} else {
+						$quiz_id = 0;
+						$log[] = '[Dry Run] Would insert new quiz master row.';
+					}
+				} else {
+					// tags/cpt-only modes with no existing quiz
+					$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
 				}
 			}
 
-			// Import questions/answers
+			// Update settings (master) only if plan says so
+			if ( $quiz_id && $plan['update_master'] ) {
+				if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
+				else $log[] = '[Dry Run] Would update quiz master row.';
+			}
+
+			// Questions/Answers handling
 			$questions = is_array($data['questions']) ? $data['questions'] : [];
 			$q_count = 0;
 			$a_count = 0;
 
-			foreach ( $questions as $i => $q ) {
-				$q_count++;
-
-				$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
-
-				// Safe mapping for answer_type (+ special-case truefalse)
-				$q = self::apply_safe_mappings_to_question( $q, $log );
-
-				if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
-				else {
-					$qid = 0;
-					$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
+			if ( $quiz_id && $plan['replace_questions'] ) {
+				if ( ! $is_dry ) {
+					$log[] = "Replace questions enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
+					self::delete_quiz_children( (int) $quiz_id, $log );
+				} else {
+					$log[] = '[Dry Run] Would delete existing questions/answers.';
 				}
 
-				$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
-				foreach ( $answers as $j => $ans ) {
-					$a_count++;
-					$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
+				foreach ( $questions as $i => $q ) {
+					$q_count++;
+					$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
 
-					if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
-					else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
+					$q = self::apply_safe_mappings_to_question( $q, $log );
+
+					if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
+					else {
+						$qid = 0;
+						$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
+					}
+
+					$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
+					foreach ( $answers as $j => $ans ) {
+						$a_count++;
+						$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
+
+						if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
+						else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
+					}
+				}
+
+			} else {
+				// No question changes in this mode (prevents accidental duplicates)
+				if ( $plan['touch_questions'] ) {
+					// touch_questions true but quiz missing or mode prevented replace; keep log for clarity
+					$log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
+				} else {
+					$log[] = "No question changes in mode '{$replace_mode}'.";
 				}
 			}
 
-			// CPT integration: create/update post and link exam_id
-			if ( $cpt_enable ) {
-				if ( $is_dry ) {
-					$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
+			// CPT integration
+			$post_id = 0;
+			if ( $plan['sync_cpt'] ) {
+				if ( $cpt_enable ) {
+					if ( $is_dry ) {
+						$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
+					} else {
+						$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw, $log );
+						if ( $post_id ) {
+							$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
+							self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+						}
+					}
 				} else {
-					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw, $log );
-					if ( $post_id ) {
-						$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
+					$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
+				}
+			}
+
+			// Tag injection (CPT taxonomy) for recommendation engine
+			if ( $plan['apply_tags'] ) {
+				$tags = [];
+				if ( isset($data['tags']) && is_array($data['tags']) ) $tags = $data['tags'];
+				elseif ( isset($data['quiz']['tags']) && is_array($data['quiz']['tags']) ) $tags = $data['quiz']['tags'];
+
+				if ( $is_dry ) {
+					$log[] = '[Dry Run] Would apply tags to CPT post (topics/difficulty/audience).';
+				} else {
+					if ( ! $cpt_enable ) {
+						$log[] = "Tags mode requested but CPT integration checkbox is OFF. Cannot apply tags without a CPT post.";
+					} elseif ( ! $post_id ) {
+						$log[] = "Tags mode requested but no CPT post_id available. Skipping tags.";
+					} else {
+						self::apply_quiz_tags( (int) $post_id, $tags, $log );
 					}
 				}
 			}
@@ -294,8 +423,15 @@ class IKA_WatuPRO_Importer {
 			if ( ! $is_dry ) $wpdb->query( 'COMMIT' );
 
 			$msg = $is_dry
-				? "Dry run complete. Would import {$q_count} questions and {$a_count} answers."
-				: "Import complete. Imported {$q_count} questions and {$a_count} answers.";
+				? "Dry run complete. Mode={$replace_mode}."
+				: "Import complete. Mode={$replace_mode}.";
+
+			// Add useful counts when questions were part of the plan
+			if ( $plan['replace_questions'] ) {
+				$msg .= $is_dry
+					? " Would import {$q_count} questions and {$a_count} answers."
+					: " Imported {$q_count} questions and {$a_count} answers.";
+			}
 
 			set_transient( 'ika_watupro_import_last_result', [
 				'ok'      => true,
@@ -318,43 +454,164 @@ class IKA_WatuPRO_Importer {
 		exit;
 	}
 
-	private static function validate_payload( array $data ) {
-		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) {
-			throw new Exception( 'Missing "quiz" object.' );
-		}
-		if ( empty( $data['quiz']['name'] ) ) {
-			throw new Exception( 'Missing quiz.name.' );
+	/** =========================
+	 * SELECTIVE REPLACE: MODE + PLAN
+	 * ========================= */
+	private static function normalize_replace_mode( string $raw_mode, bool $legacy_replace_existing ) : string {
+		$raw_mode = strtolower( trim( $raw_mode ) );
+
+		$allowed = [ 'auto','none','all','settings','questions','tags','cpt' ];
+		if ( ! in_array( $raw_mode, $allowed, true ) ) $raw_mode = 'auto';
+
+		if ( $raw_mode === 'auto' ) {
+			return $legacy_replace_existing ? 'all' : 'none';
 		}
 
-		// Allow questions: [] (do not treat empty array as missing)
+		return $raw_mode;
+	}
+
+	private static function replace_plan( string $mode, bool $cpt_enable ) : array {
+		// Keep this conservative and explicit.
+		$plan = [
+			'needs_exam'        => false, // whether we should create master if missing
+			'update_master'     => false, // update master settings
+			'replace_questions' => false, // delete + insert Q/A
+			'touch_questions'   => false, // mode cares about questions at all
+			'sync_cpt'          => false, // CPT upsert + health check
+			'apply_tags'        => false, // CPT taxonomies
+		];
+
+		switch ( $mode ) {
+			case 'all':
+				$plan['needs_exam']        = true;
+				$plan['update_master']     = true;
+				$plan['replace_questions'] = true;
+				$plan['touch_questions']   = true;
+				$plan['sync_cpt']          = $cpt_enable;
+				$plan['apply_tags']        = true;
+				break;
+
+			case 'settings':
+				$plan['needs_exam']        = true;
+				$plan['update_master']     = true;
+				$plan['sync_cpt']          = $cpt_enable;
+				break;
+
+			case 'questions':
+				$plan['needs_exam']        = true; // quiz must exist; we also allow create if missing
+				$plan['replace_questions'] = true;
+				$plan['touch_questions']   = true;
+				$plan['sync_cpt']          = $cpt_enable;
+				break;
+
+			case 'tags':
+				$plan['needs_exam']        = false; // do not create master in tags-only mode
+				$plan['sync_cpt']          = $cpt_enable; // we need a CPT post to tag
+				$plan['apply_tags']        = true;
+				break;
+
+			case 'cpt':
+				$plan['needs_exam']        = false; // do not create master in CPT-only mode
+				$plan['sync_cpt']          = $cpt_enable;
+				break;
+
+			case 'none':
+			default:
+				// Safe default: no Q/A changes, but do update master and CPT linkage if enabled.
+				$plan['needs_exam']        = true;     // create quiz if missing
+				$plan['update_master']     = true;     // update settings/title/desc/final
+				$plan['sync_cpt']          = $cpt_enable;
+				break;
+		}
+
+		return $plan;
+	}
+
+	/** =========================
+	 * MODE-AWARE VALIDATION
+	 * (keeps validate_payload() unchanged)
+	 * ========================= */
+	private static function validate_payload_by_mode( array $data, string $replace_mode ) : void {
+		// Always require quiz object + name
+		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
+		if ( empty( $data['quiz']['name'] ) ) throw new Exception( 'Missing quiz.name.' );
+
+		// Only require questions for modes that touch questions
+		$needs_questions = in_array( $replace_mode, [ 'all', 'questions' ], true );
+
+		if ( $needs_questions ) {
+			self::validate_payload( $data ); // strict original validator
+			return;
+		}
+
+		// For non-question modes, questions can be missing or empty.
+		if ( array_key_exists( 'questions', $data ) && ! is_array( $data['questions'] ) ) {
+			throw new Exception( '"questions" must be an array when provided.' );
+		}
+	}
+
+	/** =========================
+	 * TAG APPLICATION (CPT taxonomies)
+	 * ========================= */
+	private static function apply_quiz_tags( int $post_id, array $tags, array &$log ) : void {
+		if ( ! $post_id ) return;
+
+		// topics: array
+		if ( isset($tags['topics']) && is_array($tags['topics']) ) {
+			if ( taxonomy_exists( self::TAX_TOPIC ) ) {
+				wp_set_object_terms( $post_id, array_values($tags['topics']), self::TAX_TOPIC, false );
+				$log[] = "Applied topics (" . count($tags['topics']) . ") to taxonomy " . self::TAX_TOPIC . ".";
+			} else {
+				$log[] = "Taxonomy missing: " . self::TAX_TOPIC . " (topics not applied).";
+			}
+		}
+
+		// difficulty: string
+		if ( isset($tags['difficulty']) && $tags['difficulty'] !== '' ) {
+			if ( taxonomy_exists( self::TAX_DIFFICULTY ) ) {
+				wp_set_object_terms( $post_id, [ (string)$tags['difficulty'] ], self::TAX_DIFFICULTY, false );
+				$log[] = "Applied difficulty to taxonomy " . self::TAX_DIFFICULTY . ".";
+			} else {
+				$log[] = "Taxonomy missing: " . self::TAX_DIFFICULTY . " (difficulty not applied).";
+			}
+		}
+
+		// audience: array
+		if ( isset($tags['audience']) && is_array($tags['audience']) ) {
+			if ( taxonomy_exists( self::TAX_AUDIENCE ) ) {
+				wp_set_object_terms( $post_id, array_values($tags['audience']), self::TAX_AUDIENCE, false );
+				$log[] = "Applied audience (" . count($tags['audience']) . ") to taxonomy " . self::TAX_AUDIENCE . ".";
+			} else {
+				$log[] = "Taxonomy missing: " . self::TAX_AUDIENCE . " (audience not applied).";
+			}
+		}
+	}
+
+	/** =========================
+	 * ORIGINAL HELPERS (UNCHANGED)
+	 * ========================= */
+
+	private static function validate_payload( array $data ) {
+		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
+		if ( empty( $data['quiz']['name'] ) ) throw new Exception( 'Missing quiz.name.' );
+
 		if ( ! array_key_exists( 'questions', $data ) || ! is_array( $data['questions'] ) ) {
 			$keys = implode(', ', array_keys($data));
 			throw new Exception( 'Missing "questions" array. Top-level keys found: ' . $keys );
 		}
 
-		// If questions exist, validate their shape
 		foreach ( $data['questions'] as $idx => $q ) {
-			if ( empty( $q['question_html'] ) ) {
-				throw new Exception( "Question #".($idx+1)." missing question_html." );
-			}
-			if ( empty( $q['answer_type'] ) ) {
-				throw new Exception( "Question #".($idx+1)." missing answer_type." );
-			}
-			if ( empty( $q['answers'] ) || ! is_array( $q['answers'] ) ) {
-				throw new Exception( "Question #".($idx+1)." missing answers array." );
-			}
+			if ( empty( $q['question_html'] ) ) throw new Exception( "Question #".($idx+1)." missing question_html." );
+			if ( empty( $q['answer_type'] ) ) throw new Exception( "Question #".($idx+1)." missing answer_type." );
+			if ( empty( $q['answers'] ) || ! is_array( $q['answers'] ) ) throw new Exception( "Question #".($idx+1)." missing answers array." );
 			foreach ( $q['answers'] as $a ) {
-				if ( empty( $a['answer_html'] ) ) {
-					throw new Exception( "A question has an answer missing answer_html." );
-				}
+				if ( empty( $a['answer_html'] ) ) throw new Exception( "A question has an answer missing answer_html." );
 			}
 		}
 	}
 
-	/** Safe mapping layer */
 	private static function apply_safe_mappings_to_question( array $q, array &$log ) : array {
 		$raw_type = isset($q['answer_type']) ? strtolower(trim((string)$q['answer_type'])) : '';
-
 		$map = [
 			'single'   => 'radio',
 			'multi'    => 'checkbox',
@@ -368,7 +625,6 @@ class IKA_WatuPRO_Importer {
 			$log[] = "Safe-mapped answer_type '{$raw_type}' → '{$q['answer_type']}'.";
 		}
 
-		// Special-case: true/false convenience
 		if ( $raw_type === 'truefalse' || $raw_type === 'true_false' || $raw_type === 'tf' ) {
 			$q['answer_type'] = 'radio';
 			$q['truefalse'] = 1;
@@ -398,7 +654,6 @@ class IKA_WatuPRO_Importer {
 			'description'         => $desc,
 			'final_screen'        => $final,
 			'added_on'            => current_time( 'mysql' ),
-
 			'is_active'           => isset($settings['is_active']) ? (int)$settings['is_active'] : 1,
 			'require_login'       => isset($settings['require_login']) ? (int)$settings['require_login'] : 0,
 			'take_again'          => isset($settings['take_again']) ? (int)$settings['take_again'] : 0,
@@ -408,16 +663,13 @@ class IKA_WatuPRO_Importer {
 			'mode'                => isset($settings['mode']) ? sanitize_text_field((string)$settings['mode']) : 'live',
 		];
 
-		// Support both: quiz.reuse_questions_from (top-level) and quiz.settings.reuse_questions_from
 		if ( isset($quiz['reuse_questions_from']) ) {
 			$row['reuse_questions_from'] = sanitize_text_field( (string) $quiz['reuse_questions_from'] );
 		} elseif ( isset($settings['reuse_questions_from']) ) {
 			$row['reuse_questions_from'] = sanitize_text_field( (string) $settings['reuse_questions_from'] );
 		}
 
-		if ( ! $wpdb->insert( $table, $row ) ) {
-			throw new Exception( 'Insert quiz failed: ' . $wpdb->last_error );
-		}
+		if ( ! $wpdb->insert( $table, $row ) ) throw new Exception( 'Insert quiz failed: ' . $wpdb->last_error );
 
 		$id = (int) $wpdb->insert_id;
 		$log[] = "Inserted quiz master row ID={$id}.";
@@ -445,7 +697,6 @@ class IKA_WatuPRO_Importer {
 		if ( array_key_exists( 'login_mode', $settings ) ) $update['login_mode'] = sanitize_text_field((string)$settings['login_mode']);
 		if ( array_key_exists( 'mode', $settings ) ) $update['mode'] = sanitize_text_field((string)$settings['mode']);
 
-		// Support both: quiz.reuse_questions_from (top-level) and quiz.settings.reuse_questions_from
 		if ( array_key_exists( 'reuse_questions_from', $quiz ) ) {
 			$update['reuse_questions_from'] = sanitize_text_field((string)$quiz['reuse_questions_from']);
 		} elseif ( array_key_exists( 'reuse_questions_from', $settings ) ) {
@@ -495,9 +746,7 @@ class IKA_WatuPRO_Importer {
 			'truefalse'              => isset($q['truefalse']) ? (int) $q['truefalse'] : 0,
 		];
 
-		if ( ! $wpdb->insert( $table, $row ) ) {
-			throw new Exception( 'Insert question failed: ' . $wpdb->last_error );
-		}
+		if ( ! $wpdb->insert( $table, $row ) ) throw new Exception( 'Insert question failed: ' . $wpdb->last_error );
 
 		$qid = (int) $wpdb->insert_id;
 		$log[] = "Inserted question ID={$qid} (quiz ID={$quiz_id}, sort_order={$sort_order}).";
@@ -509,7 +758,7 @@ class IKA_WatuPRO_Importer {
 		$table = self::t_answer();
 
 		$correct = 0;
-		if ( isset($ans['correct']) ) $correct = (int) $ans['correct'] ? 1 : 0;
+		if ( isset($ans['correct']) )    $correct = (int) $ans['correct'] ? 1 : 0;
 		if ( isset($ans['is_correct']) ) $correct = (int) $ans['is_correct'] ? 1 : 0;
 
 		$row = [
@@ -525,16 +774,20 @@ class IKA_WatuPRO_Importer {
 			'accept_freetext' => 0,
 		];
 
-		if ( ! $wpdb->insert( $table, $row ) ) {
-			throw new Exception( 'Insert answer failed: ' . $wpdb->last_error );
-		}
+		if ( ! $wpdb->insert( $table, $row ) ) throw new Exception( 'Insert answer failed: ' . $wpdb->last_error );
 
 		$aid = (int) $wpdb->insert_id;
 		$log[] = "Inserted answer ID={$aid} (question ID={$question_id}, correct={$row['correct']}, sort_order={$sort_order}).";
 		return $aid;
 	}
 
-	/** CPT upsert: create/update a WP Quiz post linked to exam ID */
+	/**
+	 * CPT upsert:
+	 * - Find existing CPT post by meta _ika_watupro_exam_id
+	 * - Fallback: find by exact title match if no meta-linked post exists
+	 * - ALWAYS force post_content to [watupro EXAM_ID] so wrapper filter can apply hero-jet
+	 * - Always attach exam_id meta for stability
+	 */
 	private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
 		$post_type = self::CPT_POST_TYPE;
 
@@ -544,41 +797,91 @@ class IKA_WatuPRO_Importer {
 		}
 
 		$title = sanitize_text_field( (string) $quiz['name'] );
-		$content = isset( $quiz['description_html'] ) ? wp_kses_post( (string) $quiz['description_html'] ) : '';
 
+		// Canonical content: let your wrapper filter do the <div class="ika-quiz-page hero-jet"> wrapper.
+		$content = '[watupro ' . (int) $exam_id . ']';
+
+		// 1) Find by meta link first
 		$existing = get_posts([
 			'post_type'      => $post_type,
 			'post_status'    => 'any',
 			'posts_per_page' => 1,
 			'meta_key'       => self::CPT_META_EXAM_ID,
 			'meta_value'     => $exam_id,
+			'orderby'        => 'ID',
+			'order'          => 'DESC',
 			'fields'         => 'ids',
 		]);
+
+		// 2) Fallback: exact title match to prevent duplicates if older posts lacked meta
+		if ( empty( $existing ) ) {
+			$title_match = get_posts([
+				'post_type'      => $post_type,
+				'post_status'    => 'any',
+				'posts_per_page' => 1,
+				's'              => $title,
+				'orderby'        => 'ID',
+				'order'          => 'DESC',
+				'fields'         => 'ids',
+			]);
+
+			// Ensure exact match if we got a result
+			if ( ! empty( $title_match ) ) {
+				$candidate_id = (int) $title_match[0];
+				$candidate_title = get_the_title( $candidate_id );
+				if ( $candidate_title === $title ) {
+					$existing = [ $candidate_id ];
+					$log[] = "No meta-linked CPT found. Using title-match post ID={$candidate_id} and attaching meta.";
+				}
+			}
+		}
 
 		$postarr = [
 			'post_type'    => $post_type,
 			'post_title'   => $title,
-			'post_content' => $content,
 			'post_status'  => 'publish',
+			'post_content' => $content, // force content so shortcode wrapper filter always runs
 		];
 
-		if ( $existing ) {
+		if ( ! empty( $existing ) ) {
 			$postarr['ID'] = (int) $existing[0];
 			$post_id = wp_update_post( $postarr, true );
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
-			$log[] = "Updated CPT post ID={$post_id}.";
+			$log[] = "Updated CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		} else {
 			$post_id = wp_insert_post( $postarr, true );
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
-			$log[] = "Created CPT post ID={$post_id}.";
+			$log[] = "Created CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		}
 
 		update_post_meta( $post_id, self::CPT_META_EXAM_ID, $exam_id );
-
-		$hash = hash( 'sha256', $raw_json );
-		update_post_meta( $post_id, self::CPT_META_IMPORT_HASH, $hash );
+		update_post_meta( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', $raw_json ) );
 
 		return (int) $post_id;
+	}
+
+	private static function cpt_health_check( int $post_id, int $exam_id, array &$log ) : void {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			$log[] = "[CPT Health] ERROR: post_id={$post_id} not found.";
+			return;
+		}
+
+		$meta_exam = get_post_meta( $post_id, self::CPT_META_EXAM_ID, true );
+		$expected_shortcode = '[watupro ' . (int) $exam_id . ']';
+
+		$has_shortcode = ( strpos( (string) $post->post_content, $expected_shortcode ) !== false );
+
+		$log[] = "[CPT Health] post_id={$post_id}, post_type={$post->post_type}, status={$post->post_status}";
+		$log[] = "[CPT Health] meta " . self::CPT_META_EXAM_ID . " = " . ( $meta_exam === '' ? '(empty)' : $meta_exam ) . " (expected {$exam_id})";
+		$log[] = "[CPT Health] shortcode present: " . ( $has_shortcode ? 'YES' : 'NO' ) . " (expected {$expected_shortcode})";
+
+		if ( (string) $meta_exam !== (string) $exam_id ) {
+			$log[] = "[CPT Health] WARNING: CPT meta exam_id mismatch. Importer may not update the correct post next run.";
+		}
+		if ( ! $has_shortcode ) {
+			$log[] = "[CPT Health] WARNING: CPT post_content does not contain the expected WatuPRO shortcode, wrapper will not apply.";
+		}
 	}
 
 	/** =========================
@@ -627,13 +930,12 @@ class IKA_WatuPRO_Importer {
 		$master = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$tm} WHERE ID = %d", $quiz_id ), ARRAY_A );
 		if ( ! $master ) throw new Exception( "Quiz ID {$quiz_id} not found." );
 
-		// Reuse-aware export: if reuse_questions_from is set, export questions from that exam_id.
 		$source_quiz_id = $quiz_id;
 		$reuse_raw = isset($master['reuse_questions_from']) ? trim((string)$master['reuse_questions_from']) : '';
 		if ( $reuse_raw !== '' && $reuse_raw !== '0' ) {
 			if ( preg_match( '/^\d+$/', $reuse_raw ) ) {
 				$source_quiz_id = (int) $reuse_raw;
-			} else if ( preg_match( '/\d+/', $reuse_raw, $m ) ) {
+			} elseif ( preg_match( '/\d+/', $reuse_raw, $m ) ) {
 				$source_quiz_id = (int) $m[0];
 			}
 		}
@@ -646,7 +948,7 @@ class IKA_WatuPRO_Importer {
 		$export_note = '';
 		if ( empty($questions) ) {
 			$export_note = 'No questions found for the exported source exam_id. This quiz may be empty or the source exam_id may be incorrect.';
-		} else if ( $source_quiz_id !== $quiz_id ) {
+		} elseif ( $source_quiz_id !== $quiz_id ) {
 			$export_note = 'This quiz reuses questions. Export pulled questions from the source exam_id instead of the selected quiz ID.';
 		}
 

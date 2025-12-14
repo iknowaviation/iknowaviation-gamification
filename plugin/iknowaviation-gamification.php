@@ -28,6 +28,7 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/feature-flags.php';
  */
 require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
+require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro/quiz-wrapper.php';
 
 /**
  * Optional improvement:
