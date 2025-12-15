@@ -942,127 +942,135 @@ class IKA_WatuPRO_Importer {
 	}
 
 	private static function import_one_payload( array $data, string $raw_one, array $plan, bool $is_dry, string $replace_mode, bool $cpt_enable, array &$log ) : array {
-		// Auto-clear reuse_questions_from whenever questions are provided on import (even if mode won't apply them)
-		$has_questions = isset($data['questions']) && is_array($data['questions']) && count($data['questions']) > 0;
-		if ( $has_questions ) {
-			$data['quiz']['reuse_questions_from'] = '';
-			if ( ! isset($data['quiz']['settings']) || ! is_array($data['quiz']['settings']) ) {
-				$data['quiz']['settings'] = [];
-			}
-			$data['quiz']['settings']['reuse_questions_from'] = '';
-		}
-
-		$quiz      = $data['quiz'];
-		$quiz_name = trim( (string) $quiz['name'] );
-		$log[]     = 'Quiz name: ' . $quiz_name;
-
-		$quiz_id = self::find_quiz_id_by_name( $quiz_name );
-
-		if ( $quiz_id ) $log[] = "Existing quiz found (ID={$quiz_id}).";
-		else $log[] = "No existing quiz found.";
-
-		if ( ! $quiz_id ) {
-			if ( $plan['needs_exam'] ) {
-				if ( ! $is_dry ) {
-					$quiz_id = self::insert_master( $quiz, $log );
-				} else {
-					// Dry Run: simulate a quiz ID so we can preview/import questions/answers and get accurate counts/logs.
-					$quiz_id = -1;
-					$log[] = '[Dry Run] Would insert new quiz master row (simulated quiz_id=-1 for preview).';
+		try {
+		
+			// Auto-clear reuse_questions_from whenever questions are provided on import (even if mode won't apply them)
+			$has_questions = isset($data['questions']) && is_array($data['questions']) && count($data['questions']) > 0;
+			if ( $has_questions ) {
+				$data['quiz']['reuse_questions_from'] = '';
+				if ( ! isset($data['quiz']['settings']) || ! is_array($data['quiz']['settings']) ) {
+					$data['quiz']['settings'] = [];
 				}
-			} else {
-				$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
-			}
-		}
-
-		if ( $quiz_id && $plan['update_master'] ) {
-			if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
-			else $log[] = '[Dry Run] Would update quiz master row.';
-		}
-
-		$questions = ( isset($data['questions']) && is_array($data['questions']) ) ? $data['questions'] : [];
-		$q_count = 0;
-		$a_count = 0;
-
-		if ( $quiz_id && $plan['replace_questions'] ) {
-			if ( ! $is_dry ) {
-				$log[] = "Replace questions enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
-				self::delete_quiz_children( (int) $quiz_id, $log );
-			} else {
-				$log[] = '[Dry Run] Would delete existing questions/answers.';
+				$data['quiz']['settings']['reuse_questions_from'] = '';
 			}
 
-			foreach ( $questions as $i => $q ) {
-				$q_count++;
-				$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
+			$quiz      = $data['quiz'];
+			$quiz_name = trim( (string) $quiz['name'] );
+			$log[]     = 'Quiz name: ' . $quiz_name;
 
-				$q = self::apply_safe_mappings_to_question( $q, $log );
+			$quiz_id = self::find_quiz_id_by_name( $quiz_name );
 
-				if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
-				else {
-					$qid = 0;
-					$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
-				}
+			if ( $quiz_id ) $log[] = "Existing quiz found (ID={$quiz_id}).";
+			else $log[] = "No existing quiz found.";
 
-				$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
-				foreach ( $answers as $j => $ans ) {
-					$a_count++;
-					$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
-					if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
-					else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
-				}
-			}
-
-		} else {
-			if ( $plan['touch_questions'] ) $log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
-			else $log[] = "No question changes in mode '{$replace_mode}'.";
-		}
-
-		$post_id = 0;
-		if ( $plan['sync_cpt'] ) {
-			if ( $cpt_enable ) {
-				if ( $is_dry ) {
-					$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
-				} else {
-				  try {
-					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
-
-					if ( $post_id ) {
-					  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
-					  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+			if ( ! $quiz_id ) {
+				if ( $plan['needs_exam'] ) {
+					if ( ! $is_dry ) {
+						$quiz_id = self::insert_master( $quiz, $log );
 					} else {
-					  $log[] = "CPT sync returned no post_id (unexpected).";
+						// Dry Run: simulate a quiz ID so we can preview/import questions/answers and get accurate counts/logs.
+						$quiz_id = -1;
+						$log[] = '[Dry Run] Would insert new quiz master row (simulated quiz_id=-1 for preview).';
 					}
-				  } catch ( Throwable $t ) {
-					// PHP 8+: catches Errors (undefined function, type errors, etc.) as well as Exceptions
-					$log[] = 'CPT sync failed (caught): ' . $t->getMessage();
-					if ( function_exists('wp_get_environment_type') ) {
-					  $log[] = 'WP env: ' . wp_get_environment_type();
-					}
-				  }
+				} else {
+					$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
 				}
-			} else {
-				$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
 			}
-		}
 
-		if ( $plan['apply_tags'] ) {
-			$tags = [];
-			if ( isset($data['tags']) && is_array($data['tags']) ) $tags = $data['tags'];
-			elseif ( isset($data['quiz']['tags']) && is_array($data['quiz']['tags']) ) $tags = $data['quiz']['tags'];
-
-			if ( $is_dry ) {
-				$log[] = '[Dry Run] Would apply tags to CPT post (topics/difficulty/audience).';
-			} else {
-				if ( ! $cpt_enable ) $log[] = "Tags mode requested but CPT integration checkbox is OFF. Cannot apply tags without a CPT post.";
-				elseif ( ! $post_id ) $log[] = "Tags mode requested but no CPT post_id available. Skipping tags.";
-				else self::apply_quiz_tags( (int) $post_id, $tags, $log );
+			if ( $quiz_id && $plan['update_master'] ) {
+				if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
+				else $log[] = '[Dry Run] Would update quiz master row.';
 			}
-		}
 
-		return [ 'quiz_id' => (int)$quiz_id, 'post_id' => (int)$post_id, 'questions' => (int)$q_count, 'answers' => (int)$a_count ];
+			$questions = ( isset($data['questions']) && is_array($data['questions']) ) ? $data['questions'] : [];
+			$q_count = 0;
+			$a_count = 0;
+
+			if ( $quiz_id && $plan['replace_questions'] ) {
+				if ( ! $is_dry ) {
+					$log[] = "Replace questions enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
+					self::delete_quiz_children( (int) $quiz_id, $log );
+				} else {
+					$log[] = '[Dry Run] Would delete existing questions/answers.';
+				}
+
+				foreach ( $questions as $i => $q ) {
+					$q_count++;
+					$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
+
+					$q = self::apply_safe_mappings_to_question( $q, $log );
+
+					if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
+					else {
+						$qid = 0;
+						$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
+					}
+
+					$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
+					foreach ( $answers as $j => $ans ) {
+						$a_count++;
+						$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
+						if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
+						else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
+					}
+				}
+
+			} else {
+				if ( $plan['touch_questions'] ) $log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
+				else $log[] = "No question changes in mode '{$replace_mode}'.";
+			}
+
+			$post_id = 0;
+			if ( $plan['sync_cpt'] ) {
+				if ( $cpt_enable ) {
+					if ( $is_dry ) {
+						$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
+					} else {
+					  try {
+						$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
+
+						if ( $post_id ) {
+						  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
+						  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+						} else {
+						  $log[] = "CPT sync returned no post_id (unexpected).";
+						}
+					  } catch ( Throwable $t ) {
+						// PHP 8+: catches Errors (undefined function, type errors, etc.) as well as Exceptions
+						$log[] = 'CPT sync failed (caught): ' . $t->getMessage();
+						if ( function_exists('wp_get_environment_type') ) {
+						  $log[] = 'WP env: ' . wp_get_environment_type();
+						}
+					  }
+					}
+				} else {
+					$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
+				}
+			}
+
+			if ( $plan['apply_tags'] ) {
+				$tags = [];
+				if ( isset($data['tags']) && is_array($data['tags']) ) $tags = $data['tags'];
+				elseif ( isset($data['quiz']['tags']) && is_array($data['quiz']['tags']) ) $tags = $data['quiz']['tags'];
+
+				if ( $is_dry ) {
+					$log[] = '[Dry Run] Would apply tags to CPT post (topics/difficulty/audience).';
+				} else {
+					if ( ! $cpt_enable ) $log[] = "Tags mode requested but CPT integration checkbox is OFF. Cannot apply tags without a CPT post.";
+					elseif ( ! $post_id ) $log[] = "Tags mode requested but no CPT post_id available. Skipping tags.";
+					else self::apply_quiz_tags( (int) $post_id, $tags, $log );
+				}
+			}
+
+			return [ 'quiz_id' => (int)$quiz_id, 'post_id' => (int)$post_id, 'questions' => (int)$q_count, 'answers' => (int)$a_count ];
+		} catch ( Throwable $t ) {
+			$log[] = 'IMPORT_ONE_PAYLOAD fatal (caught): ' . $t->getMessage();
+			if ( function_exists('wp_get_environment_type') ) {
+				$log[] = 'WP env: ' . wp_get_environment_type();
+			}
+			throw $t;
+		}	
 	}
-
 
 	/** =========================
 	 * TAG APPLICATION (CPT taxonomies)
