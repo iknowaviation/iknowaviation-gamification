@@ -724,7 +724,7 @@ class IKA_WatuPRO_Importer {
 				'log'     => $log,
 			], 60 );
 
-		} catch ( Exception $e ) {
+		} catch ( Throwable $e ) {
 			global $wpdb;
 			if ( ! empty( $wpdb ) && ! $is_dry ) {
 				$wpdb->query( 'ROLLBACK' );
