@@ -700,8 +700,15 @@ class IKA_WatuPRO_Importer {
 
 		$plan = self::replace_plan( $replace_mode, $cpt_enable );
 
-		$log = [];
+		$log = [];		
 		$log[] = "Replace mode: {$replace_mode}";
+		
+		// DEBUG marker so we always know the handler completed enough to reach this point.
+		set_transient( 'ika_watupro_import_last_result', [
+			'ok'      => false,
+			'message' => 'DEBUG: handle_import reached (if this is the only message, the request died later).',
+			'log'     => $log,
+		], 300 );
 
 		try {
 			if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) throw new Exception( 'No file uploaded.' );
