@@ -1024,11 +1024,22 @@ class IKA_WatuPRO_Importer {
 				if ( $is_dry ) {
 					$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
 				} else {
-					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
+				  try {
+					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_json, $log );
+
 					if ( $post_id ) {
-						$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
-						self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+					  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
+					  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+					} else {
+					  $log[] = "CPT sync returned no post_id (unexpected).";
 					}
+				  } catch ( Throwable $t ) {
+					// PHP 8+: catches Errors (undefined function, type errors, etc.) as well as Exceptions
+					$log[] = 'CPT sync failed (caught): ' . $t->getMessage();
+					if ( function_exists('wp_get_environment_type') ) {
+					  $log[] = 'WP env: ' . wp_get_environment_type();
+					}
+				  }
 				}
 			} else {
 				$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
