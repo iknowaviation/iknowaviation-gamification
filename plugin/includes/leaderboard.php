@@ -35,25 +35,25 @@ add_shortcode( 'ika_leaderboard', function( $atts ) {
 	$atts  = shortcode_atts( array( 'limit' => 10 ), $atts );
 	$limit = max( 1, intval( $atts['limit'] ) );
 
-	$users = new WP_User_Query( array(
-		'number'     => $limit,
-		'meta_key'   => 'ika_total_xp',
-		'orderby'    => 'meta_value_num',
-		'order'      => 'DESC',
-		'meta_query' => array(
-			array(
-				'key'     => 'ika_total_xp',
-				'value'   => 1,
-				'compare' => '>=',
-				'type'    => 'NUMERIC',
-			),
-		),
-	) );
-
 	$cache_key = 'ika_leaderboard_top_' . $limit;
 	$results   = get_transient( $cache_key );
 
 	if ( false === $results ) {
+		$users = new WP_User_Query( array(
+			'number'     => $limit,
+			'meta_key'   => 'ika_total_xp',
+			'orderby'    => 'meta_value_num',
+			'order'      => 'DESC',
+			'meta_query' => array(
+				array(
+					'key'     => 'ika_total_xp',
+					'value'   => 1,
+					'compare' => '>=',
+					'type'    => 'NUMERIC',
+				),
+			),
+		) );
+
 		$results = $users->get_results();
 		// Cache for 10 minutes (adjust later)
 		set_transient( $cache_key, $results, 10 * MINUTE_IN_SECONDS );

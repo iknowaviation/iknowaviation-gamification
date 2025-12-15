@@ -54,50 +54,32 @@ function ika_get_rank_ladder() {
         }
     }
 
-    // ---- Fallback: your existing static ladder (keep this exactly as it was) ----
+	// ---- Fallback ladder (ONLY used if WatuPRO Play levels cannot be read) ----
+	// This MUST match your locked IKA XP ladder (Phase 1 foundation):
+	// 0, 50, 150, 300, 500, 800, 1200, 1700, 2500, 3500, 5000
+	$ladder = array(
+		array( 'slug' => 'aviation-enthusiast',     'label' => 'Aviation Enthusiast',     'min_xp' => 0 ),
+		array( 'slug' => 'student-pilot',          'label' => 'Student Pilot',          'min_xp' => 50 ),
+		array( 'slug' => 'sport-pilot',            'label' => 'Sport Pilot',            'min_xp' => 150 ),
+		array( 'slug' => 'private-pilot',          'label' => 'Private Pilot',          'min_xp' => 300 ),
+		array( 'slug' => 'instrument-rated',       'label' => 'Instrument Rated',       'min_xp' => 500 ),
+		array( 'slug' => 'commercial-pilot',       'label' => 'Commercial Pilot',       'min_xp' => 800 ),
+		array( 'slug' => 'airline-transport-pilot','label' => 'Airline Transport Pilot','min_xp' => 1200 ),
+		array( 'slug' => 'airline-first-officer',  'label' => 'Airline First Officer',  'min_xp' => 1700 ),
+		array( 'slug' => 'airline-captain',        'label' => 'Airline Captain',        'min_xp' => 2500 ),
+		array( 'slug' => 'chief-pilot',            'label' => 'Chief Pilot',            'min_xp' => 3500 ),
+		array( 'slug' => 'aviation-master',        'label' => 'Aviation Master',        'min_xp' => 5000 ),
+	);
 
-    return array(
-        array(
-            'slug'   => 'aviation-enthusiast',
-            'label'  => 'Aviation Enthusiast',
-            'min_xp' => 0,
-        ),
-        array(
-            'slug'   => 'student-pilot',
-            'label'  => 'Student Pilot',
-            'min_xp' => 18,
-        ),
-        array(
-            'slug'   => 'private-pilot',
-            'label'  => 'Private Pilot',
-            'min_xp' => 25,
-        ),
-        array(
-            'slug'   => 'instrument-rated-pilot',
-            'label'  => 'Instrument-Rated Pilot',
-            'min_xp' => 27,
-        ),
-        array(
-            'slug'   => 'commercial-pilot',
-            'label'  => 'Commercial Pilot',
-            'min_xp' => 29,
-        ),
-        array(
-            'slug'   => 'sport-pilot',
-            'label'  => 'Sport Pilot',
-            'min_xp' => 23,
-        ),
-        array(
-            'slug'   => 'airline-transport-pilot',
-            'label'  => 'Airline Transport Pilot',
-            'min_xp' => 31,
-        ),
-        array(
-            'slug'   => 'captain',
-            'label'  => 'Captain',
-            'min_xp' => 33,
-        ),
-    );
+	// Defensive sort (prevents accidental out-of-order edits from breaking rank calc).
+	usort(
+		$ladder,
+		function ( $a, $b ) {
+			return $a['min_xp'] <=> $b['min_xp'];
+		}
+	);
+
+	return $ladder;
 }
 
 /**

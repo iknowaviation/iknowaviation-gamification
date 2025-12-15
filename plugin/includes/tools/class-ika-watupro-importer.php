@@ -30,10 +30,20 @@ class IKA_WatuPRO_Importer {
 	const TAX_DIFFICULTY         = 'ika_difficulty';
 	const TAX_AUDIENCE           = 'ika_audience';
 
-	// Your table names (from your SQL dump)
-	private static function t_master()   { return 'wp_2cd0c0f1b0_watupro_master'; }
-	private static function t_question() { return 'wp_2cd0c0f1b0_watupro_question'; }
-	private static function t_answer()   { return 'wp_2cd0c0f1b0_watupro_answer'; }
+	// WatuPRO tables (prefix-safe). This keeps the importer working across hosts/staging.
+	// NOTE: WatuPRO uses the standard WP $wpdb->prefix.
+	private static function t_master() {
+		global $wpdb;
+		return $wpdb->prefix . 'watupro_master';
+	}
+	private static function t_question() {
+		global $wpdb;
+		return $wpdb->prefix . 'watupro_question';
+	}
+	private static function t_answer() {
+		global $wpdb;
+		return $wpdb->prefix . 'watupro_answer';
+	}
 
 	public static function init() {
 		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );

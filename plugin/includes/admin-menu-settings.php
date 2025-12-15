@@ -47,14 +47,25 @@ function ika_gam_get_settings() {
  * @return bool
  */
 function ika_gam_get_setting( $key ) {
-    $settings = ika_gam_get_settings();
+	// Bridge legacy settings -> feature flags (avoids having 2 separate toggle systems).
+	// Keep this mapping minimal and backwards compatible.
+	if ( function_exists( 'ika_gam_feature_enabled' ) ) {
+		if ( $key === 'enable_daily_missions' ) {
+			return ika_gam_feature_enabled( 'missions' );
+		}
+		if ( $key === 'enable_avatar_modal' ) {
+			return ika_gam_feature_enabled( 'watuplay' );
+		}
+	}
 
-    if ( isset( $settings[ $key ] ) ) {
-        return (bool) $settings[ $key ];
-    }
+	$settings = ika_gam_get_settings();
 
-    // If unknown key, default to false.
-    return false;
+	if ( isset( $settings[ $key ] ) ) {
+		return (bool) $settings[ $key ];
+	}
+
+	// If unknown key, default to false.
+	return false;
 }
 
 /* ----------------------------------------------------------------------
@@ -123,14 +134,19 @@ function ika_gam_render_settings_page() {
         );
 
         update_option( 'ika_gam_settings', $new_settings );
+
+		// Also persist into the feature flags system if available.
+		// This makes the toggles actually control the underlying subsystems.
+		if ( function_exists( 'ika_gam_set_feature_flag' ) ) {
+			ika_gam_set_feature_flag( 'missions', ! empty( $new_settings['enable_daily_missions'] ) );
+			ika_gam_set_feature_flag( 'watuplay', ! empty( $new_settings['enable_avatar_modal'] ) );
+		}
         $updated = true;
     }
 
-    $settings = ika_gam_get_settings();
-
-    // Status values.
-    $daily_on   = ! empty( $settings['enable_daily_missions'] );
-    $avatar_on  = ! empty( $settings['enable_avatar_modal'] );
+	// Read status from the bridge (feature flags first, then legacy option).
+	$daily_on  = ika_gam_get_setting( 'enable_daily_missions' );
+	$avatar_on = ika_gam_get_setting( 'enable_avatar_modal' );
 
     $daily_label  = $daily_on ? 'ON' : 'OFF';
     $avatar_label = $avatar_on ? 'ON' : 'OFF';
@@ -216,7 +232,7 @@ function ika_gam_render_settings_page() {
                                     id="enable_daily_missions"
                                     name="enable_daily_missions"
                                     value="1"
-                                    <?php checked( $settings['enable_daily_missions'], 1 ); ?>
+                                    <?php checked( $daily_on, true ); ?>
                                 />
                                 Enable the Daily Missions panel, streak, and XP rewards.
                             </label>
@@ -234,7 +250,7 @@ function ika_gam_render_settings_page() {
                                     id="enable_avatar_modal"
                                     name="enable_avatar_modal"
                                     value="1"
-                                    <?php checked( $settings['enable_avatar_modal'], 1 ); ?>
+                                    <?php checked( $avatar_on, true ); ?>
                                 />
                                 Enable the unified Watu Play level + badges modal and avatar picker.
                             </label>
