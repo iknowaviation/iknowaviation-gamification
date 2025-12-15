@@ -1025,7 +1025,7 @@ class IKA_WatuPRO_Importer {
 					$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
 				} else {
 				  try {
-					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_json, $log );
+					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
 
 					if ( $post_id ) {
 					  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
