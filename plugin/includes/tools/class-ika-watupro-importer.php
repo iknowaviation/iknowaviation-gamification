@@ -652,6 +652,37 @@ class IKA_WatuPRO_Importer {
 	 * IMPORT
 	 * ========================= */
 	public static function handle_import() {
+		// --- HARD FAIL-SAFE: capture fatal errors and surface them in the importer notice ---
+			register_shutdown_function( function() {
+				$e = error_get_last();
+				if ( ! $e ) return;
+
+				$fatal_types = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ];
+				if ( ! in_array( $e['type'], $fatal_types, true ) ) return;
+
+				$msg = sprintf(
+					'FATAL captured: %s in %s on line %d',
+					$e['message'] ?? '(no message)',
+					$e['file'] ?? '(unknown file)',
+					(int) ( $e['line'] ?? 0 )
+				);
+
+				// If the normal result transient wasn't written, write it now so the importer page shows *something*.
+				set_transient( 'ika_watupro_import_last_result', [
+					'ok'      => false,
+					'message' => $msg,
+					'log'     => [ $msg ],
+				], 300 );
+			} );
+
+			// Also drop a "started" marker so we know handle_import was reached at all.
+			set_transient( 'ika_watupro_import_last_result', [
+				'ok'      => false,
+				'message' => 'DEBUG: handle_import started (if you later see a fatal, it happened after this point).',
+				'log'     => [ 'DEBUG: handle_import started' ],
+			], 300 );
+			// --- END FAIL-SAFE ---
+
 		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
 		if ( empty( $_POST['ika_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ika_nonce'] ) ), 'ika_watupro_import' ) ) {
