@@ -77,7 +77,9 @@ class IKA_WatuPRO_Importer {
 		$export_last = get_transient( 'ika_watupro_export_last_result' );
 		delete_transient( 'ika_watupro_export_last_result' );
 
-		$quizzes = self::list_quizzes();
+		
+		$ck = get_transient( 'ika_watupro_cpt_last_checkpoint' );
+$quizzes = self::list_quizzes();
 		?>
 		<div class="wrap">
 			<h1>WatuPRO Importer / Exporter (JSON)</h1>
@@ -99,6 +101,13 @@ class IKA_WatuPRO_Importer {
 					<p><strong><?php echo esc_html( $export_last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $export_last['message'] ); ?></p>
 				</div>
 			<?php endif; ?>
+			<?php if ( ! empty( $ck ) && ! empty( $ck['msg'] ) ) : ?>
+				<div class="notice notice-warning">
+					<p><strong>Last CPT checkpoint:</strong> <?php echo esc_html( $ck['msg'] ); ?></p>
+				</div>
+			<?php endif; ?>
+
+
 
 			<hr />
 
@@ -1369,72 +1378,74 @@ class IKA_WatuPRO_Importer {
 	 * - ALWAYS force post_content to [watupro EXAM_ID] so wrapper filter can apply hero-jet
 	 * - Always attach exam_id meta for stability
 	 */
-	private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
+	
+	private static function cpt_checkpoint( string $msg, array &$log ) : void {
+		$log[] = '[CPT] ' . $msg;
+		set_transient( 'ika_watupro_cpt_last_checkpoint', [
+			'time' => time(),
+			'msg'  => $msg,
+		], 300 );
+	}
+
+private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
+		self::cpt_checkpoint( "Entered upsert_quiz_cpt_post(exam_id={$exam_id})", $log );
+
 		$post_type = self::CPT_POST_TYPE;
 
 		if ( ! post_type_exists( $post_type ) ) {
-			$log[] = "CPT post_type '{$post_type}' does not exist. Skipping CPT creation.";
+			self::cpt_checkpoint( "post_type '{$post_type}' does not exist", $log );
 			return 0;
 		}
 
-		$title = sanitize_text_field( (string) $quiz['name'] );
+		$title   = sanitize_text_field( (string) ( $quiz['name'] ?? '' ) );
 		$content = '[watupro ' . (int) $exam_id . ']';
 
-		$existing = get_posts([
+		self::cpt_checkpoint( 'Looking for existing CPT post by exam_id meta', $log );
+
+		$existing = get_posts( [
 			'post_type'      => $post_type,
 			'post_status'    => 'any',
 			'posts_per_page' => 1,
 			'meta_key'       => self::CPT_META_EXAM_ID,
 			'meta_value'     => $exam_id,
-			'orderby'        => 'ID',
-			'order'          => 'DESC',
 			'fields'         => 'ids',
-		]);
+		] );
 
-		if ( empty( $existing ) ) {
-			$title_match = get_posts([
-				'post_type'      => $post_type,
-				'post_status'    => 'any',
-				'posts_per_page' => 1,
-				's'              => $title,
-				'orderby'        => 'ID',
-				'order'          => 'DESC',
-				'fields'         => 'ids',
-			]);
-
-			if ( ! empty( $title_match ) ) {
-				$candidate_id = (int) $title_match[0];
-				$candidate_title = get_the_title( $candidate_id );
-				if ( $candidate_title === $title ) {
-					$existing = [ $candidate_id ];
-					$log[] = "No meta-linked CPT found. Using title-match post ID={$candidate_id} and attaching meta.";
-				}
-			}
-		}
+		$existing_id = ! empty( $existing ) ? (int) $existing[0] : 0;
+		self::cpt_checkpoint( $existing_id ? "Found existing post_id={$existing_id}" : 'No existing post found', $log );
 
 		$postarr = [
+			'ID'           => $existing_id,
 			'post_type'    => $post_type,
-			'post_title'   => $title,
 			'post_status'  => 'publish',
+			'post_title'   => $title,
 			'post_content' => $content,
 		];
 
-		if ( ! empty( $existing ) ) {
-			$postarr['ID'] = (int) $existing[0];
+		if ( $existing_id ) {
+			self::cpt_checkpoint( "Calling wp_update_post(post_id={$existing_id})", $log );
 			$post_id = wp_update_post( $postarr, true );
+			self::cpt_checkpoint( 'Returned from wp_update_post()', $log );
+
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
 			$log[] = "Updated CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		} else {
+			self::cpt_checkpoint( 'Calling wp_insert_post()', $log );
 			$post_id = wp_insert_post( $postarr, true );
+			self::cpt_checkpoint( 'Returned from wp_insert_post()', $log );
+
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
 			$log[] = "Created CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		}
 
+		self::cpt_checkpoint( 'Updating post meta', $log );
 		update_post_meta( $post_id, self::CPT_META_EXAM_ID, $exam_id );
-		update_post_meta( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', $raw_json ) );
+		update_post_meta( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', (string) $raw_json ) );
 
+		self::cpt_checkpoint( "Done upsert_quiz_cpt_post(post_id={$post_id})", $log );
 		return (int) $post_id;
 	}
+
 
 	private static function cpt_health_check( int $post_id, int $exam_id, array &$log ) : void {
 		$post = get_post( $post_id );
