@@ -966,8 +966,9 @@ class IKA_WatuPRO_Importer {
 				if ( ! $is_dry ) {
 					$quiz_id = self::insert_master( $quiz, $log );
 				} else {
-					$quiz_id = 0;
-					$log[] = '[Dry Run] Would insert new quiz master row.';
+					// Dry Run: simulate a quiz ID so we can preview/import questions/answers and get accurate counts/logs.
+					$quiz_id = -1;
+					$log[] = '[Dry Run] Would insert new quiz master row (simulated quiz_id=-1 for preview).';
 				}
 			} else {
 				$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
