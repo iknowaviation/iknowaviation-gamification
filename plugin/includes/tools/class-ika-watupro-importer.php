@@ -30,20 +30,10 @@ class IKA_WatuPRO_Importer {
 	const TAX_DIFFICULTY         = 'ika_difficulty';
 	const TAX_AUDIENCE           = 'ika_audience';
 
-	// WatuPRO tables (prefix-safe). This keeps the importer working across hosts/staging.
-	// NOTE: WatuPRO uses the standard WP $wpdb->prefix.
-	private static function t_master() {
-		global $wpdb;
-		return $wpdb->prefix . 'watupro_master';
-	}
-	private static function t_question() {
-		global $wpdb;
-		return $wpdb->prefix . 'watupro_question';
-	}
-	private static function t_answer() {
-		global $wpdb;
-		return $wpdb->prefix . 'watupro_answer';
-	}
+	// Table names (prefix-safe)
+	private static function t_master()   { global $wpdb; return $wpdb->prefix . 'watupro_master'; }
+	private static function t_question() { global $wpdb; return $wpdb->prefix . 'watupro_question'; }
+	private static function t_answer()   { global $wpdb; return $wpdb->prefix . 'watupro_answer'; }
 
 	public static function init() {
 		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
@@ -627,7 +617,7 @@ class IKA_WatuPRO_Importer {
 				'settings' => [
 					'is_active'           => 1,
 					'require_login'       => 1,
-					'take_again'          => 0,
+					'take_again'          => 1,
 					'randomize_questions' => 1,
 					'single_page'         => 0,
 					'login_mode'          => '',
@@ -647,6 +637,9 @@ class IKA_WatuPRO_Importer {
 				}
 			}
 		}
+
+		// Force desired default: allow retakes (base quiz may have take_again=0).
+		$settings['take_again'] = 1;
 
 		return [
 			'description_html'  => (string) ($row['description'] ?? ''),
@@ -694,145 +687,36 @@ class IKA_WatuPRO_Importer {
 			if ( ! isset($data['questions']) && isset($data['Questions']) )  $data['questions'] = $data['Questions'];
 			if ( ! isset($data['quiz']) && isset($data['Quiz']) )            $data['quiz'] = $data['Quiz'];
 
-			// Mode-aware validation (keeps validate_payload() unchanged)
-			self::validate_payload_by_mode( $data, $replace_mode );
+			// Convert locked ChatGPT schema v1.0 → one-or-more internal payloads
+			$payloads = self::expand_chatgpt_schema_to_payloads( $data, $log );
+			if ( ! is_array($payloads) || empty($payloads) ) throw new Exception( 'No quizzes found in JSON.' );
 
-			// Auto-clear reuse_questions_from whenever questions are provided on import (even if mode won't apply them)
-			$has_questions = is_array($data['questions']) && count($data['questions']) > 0;
-			if ( $has_questions ) {
-				$data['quiz']['reuse_questions_from'] = '';
-				if ( ! isset($data['quiz']['settings']) || ! is_array($data['quiz']['settings']) ) {
-					$data['quiz']['settings'] = [];
-				}
-				$data['quiz']['settings']['reuse_questions_from'] = '';
+			// Validate each payload for the selected replace mode
+			foreach ( $payloads as $pi => $p ) {
+				if ( ! is_array($p) ) throw new Exception( 'Invalid payload at index ' . $pi );
+				self::validate_payload_by_mode( $p, $replace_mode );
 			}
 
 			global $wpdb;
 			if ( ! $is_dry ) $wpdb->query( 'START TRANSACTION' );
 
-			$quiz      = $data['quiz'];
-			$quiz_name = trim( (string) $quiz['name'] );
-			$log[]     = 'Quiz name: ' . $quiz_name;
+			$total_quizzes   = 0;
+			$total_questions = 0;
+			$total_answers   = 0;
 
-			$quiz_id = self::find_quiz_id_by_name( $quiz_name );
-
-			if ( $quiz_id ) {
-				$log[] = "Existing quiz found (ID={$quiz_id}).";
-			} else {
-				$log[] = "No existing quiz found.";
-			}
-
-			// Ensure quiz master exists if needed by plan
-			if ( ! $quiz_id ) {
-				if ( $plan['needs_exam'] ) {
-					if ( ! $is_dry ) {
-						$quiz_id = self::insert_master( $quiz, $log );
-					} else {
-						$quiz_id = 0;
-						$log[] = '[Dry Run] Would insert new quiz master row.';
-					}
-				} else {
-					$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
-				}
-			}
-
-			// Update settings (master) only if plan says so
-			if ( $quiz_id && $plan['update_master'] ) {
-				if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
-				else $log[] = '[Dry Run] Would update quiz master row.';
-			}
-
-			// Questions/Answers handling
-			$questions = is_array($data['questions']) ? $data['questions'] : [];
-			$q_count = 0;
-			$a_count = 0;
-
-			if ( $quiz_id && $plan['replace_questions'] ) {
-				if ( ! $is_dry ) {
-					$log[] = "Replace questions enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
-					self::delete_quiz_children( (int) $quiz_id, $log );
-				} else {
-					$log[] = '[Dry Run] Would delete existing questions/answers.';
-				}
-
-				foreach ( $questions as $i => $q ) {
-					$q_count++;
-					$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
-
-					$q = self::apply_safe_mappings_to_question( $q, $log );
-
-					if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
-					else {
-						$qid = 0;
-						$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
-					}
-
-					$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
-					foreach ( $answers as $j => $ans ) {
-						$a_count++;
-						$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
-
-						if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
-						else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
-					}
-				}
-
-			} else {
-				if ( $plan['touch_questions'] ) {
-					$log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
-				} else {
-					$log[] = "No question changes in mode '{$replace_mode}'.";
-				}
-			}
-
-			// CPT integration
-			$post_id = 0;
-			if ( $plan['sync_cpt'] ) {
-				if ( $cpt_enable ) {
-					if ( $is_dry ) {
-						$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
-					} else {
-						$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw, $log );
-						if ( $post_id ) {
-							$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
-							self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
-						}
-					}
-				} else {
-					$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
-				}
-			}
-
-			// Tag injection (CPT taxonomy) for recommendation engine
-			if ( $plan['apply_tags'] ) {
-				$tags = [];
-				if ( isset($data['tags']) && is_array($data['tags']) ) $tags = $data['tags'];
-				elseif ( isset($data['quiz']['tags']) && is_array($data['quiz']['tags']) ) $tags = $data['quiz']['tags'];
-
-				if ( $is_dry ) {
-					$log[] = '[Dry Run] Would apply tags to CPT post (topics/difficulty/audience).';
-				} else {
-					if ( ! $cpt_enable ) {
-						$log[] = "Tags mode requested but CPT integration checkbox is OFF. Cannot apply tags without a CPT post.";
-					} elseif ( ! $post_id ) {
-						$log[] = "Tags mode requested but no CPT post_id available. Skipping tags.";
-					} else {
-						self::apply_quiz_tags( (int) $post_id, $tags, $log );
-					}
-				}
+			foreach ( $payloads as $p ) {
+				$total_quizzes++;
+				$raw_one = wp_json_encode( $p, JSON_UNESCAPED_SLASHES );
+				$res = self::import_one_payload( $p, $raw_one, $plan, $is_dry, $replace_mode, $cpt_enable, $log );
+				$total_questions += (int) ($res['questions'] ?? 0);
+				$total_answers   += (int) ($res['answers'] ?? 0);
 			}
 
 			if ( ! $is_dry ) $wpdb->query( 'COMMIT' );
 
 			$msg = $is_dry
-				? "Dry run complete. Mode={$replace_mode}."
-				: "Import complete. Mode={$replace_mode}.";
-
-			if ( $plan['replace_questions'] ) {
-				$msg .= $is_dry
-					? " Would import {$q_count} questions and {$a_count} answers."
-					: " Imported {$q_count} questions and {$a_count} answers.";
-			}
+				? "Dry Run complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}."
+				: "Import complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}.";
 
 			set_transient( 'ika_watupro_import_last_result', [
 				'ok'      => true,
@@ -842,7 +726,9 @@ class IKA_WatuPRO_Importer {
 
 		} catch ( Exception $e ) {
 			global $wpdb;
-			if ( isset( $mode ) && $mode === 'import' ) $wpdb->query( 'ROLLBACK' );
+			if ( ! empty( $wpdb ) && ! $is_dry ) {
+				$wpdb->query( 'ROLLBACK' );
+			}
 
 			set_transient( 'ika_watupro_import_last_result', [
 				'ok'      => false,
@@ -946,6 +832,227 @@ class IKA_WatuPRO_Importer {
 	}
 
 	/** =========================
+	 * CHATGPT LOCKED SCHEMA (v1.0) → INTERNAL PAYLOAD
+	 * ========================= */
+
+	private static function is_chatgpt_schema( array $data ) : bool {
+		return isset($data['version'], $data['quizzes']) && is_array($data['quizzes']);
+	}
+
+	private static function expand_chatgpt_schema_to_payloads( array $data, array &$log ) : array {
+		if ( ! self::is_chatgpt_schema( $data ) ) {
+			return [ $data ];
+		}
+
+		$ver = (string) $data['version'];
+		if ( $ver !== '1.0' ) {
+			throw new Exception( 'Unsupported schema version: ' . $ver . ' (expected 1.0).' );
+		}
+
+		$payloads = [];
+		foreach ( $data['quizzes'] as $qi => $qz ) {
+			if ( ! is_array($qz) ) throw new Exception( 'Invalid quiz object at quizzes['.$qi.'].' );
+
+			$quiz_title = isset($qz['quiz_title']) ? trim((string)$qz['quiz_title']) : '';
+			if ( $quiz_title === '' ) throw new Exception( 'Missing quiz_title at quizzes['.$qi.'].' );
+
+			$base_exam_id = isset($qz['base_exam_id']) ? (int) $qz['base_exam_id'] : 0;
+			if ( $base_exam_id <= 0 ) $base_exam_id = 6;
+
+			$defaults = self::get_master_defaults_for_builder( $base_exam_id );
+			$settings = is_array($defaults['settings'] ?? null) ? $defaults['settings'] : [];
+
+			$over = ( isset($qz['settings_overrides']) && is_array($qz['settings_overrides']) ) ? $qz['settings_overrides'] : [];
+			if ( $over ) $settings = array_merge( $settings, $over );
+
+			// Force desired platform default: allow retakes
+			$settings['take_again'] = 1;
+
+			$quiz_block = [
+				'name'                 => $quiz_title,
+				'description_html'     => isset($qz['description_html']) ? (string) $qz['description_html'] : '',
+				'final_screen_html'    => isset($qz['final_screen_html']) ? (string) $qz['final_screen_html'] : '',
+				'reuse_questions_from' => '',
+				'settings'             => $settings,
+			];
+
+			if ( empty($qz['questions']) || ! is_array($qz['questions']) ) {
+				throw new Exception( 'Missing questions array at quizzes['.$qi.'].' );
+			}
+
+			$questions = [];
+			foreach ( $qz['questions'] as $i => $qq ) {
+				if ( ! is_array($qq) ) throw new Exception( 'Invalid question object at quizzes['.$qi.'].questions['.$i.'].' );
+
+				$qtext = isset($qq['q']) ? (string) $qq['q'] : '';
+				if ( trim($qtext) === '' ) throw new Exception( 'Missing q at quizzes['.$qi.'].questions['.$i.'].' );
+
+				$qtype = isset($qq['type']) ? strtolower(trim((string)$qq['type'])) : 'single';
+				$answer_type = ( $qtype === 'single' ) ? 'radio' : ( $qtype === 'multi' ? 'checkbox' : 'radio' );
+
+				$explain = isset($qq['explanation']) ? (string) $qq['explanation'] : '';
+				if ( trim($explain) === '' ) throw new Exception( 'Missing explanation at quizzes['.$qi.'].questions['.$i.'].' );
+
+				$choices = isset($qq['choices']) && is_array($qq['choices']) ? $qq['choices'] : [];
+				if ( ! $choices ) throw new Exception( 'Missing choices at quizzes['.$qi.'].questions['.$i.'].' );
+
+				$answers = [];
+				foreach ( $choices as $ci => $cc ) {
+					if ( ! is_array($cc) ) throw new Exception( 'Invalid choice at quizzes['.$qi.'].questions['.$i.'].choices['.$ci.'].' );
+					$atext = isset($cc['a']) ? (string) $cc['a'] : '';
+					if ( trim($atext) === '' ) throw new Exception( 'Missing choice text at quizzes['.$qi.'].questions['.$i.'].choices['.$ci.'].' );
+
+					$answers[] = [
+						'answer_html' => $atext,
+						'correct'     => ! empty($cc['correct']) ? 1 : 0,
+					];
+				}
+
+				$questions[] = [
+					'question_html'       => $qtext,
+					'answer_type'         => $answer_type,
+					'explain_answer_html' => $explain,
+					'answers'             => $answers,
+				];
+			}
+
+			$tags_block = [];
+			if ( isset($qz['tags']) && is_array($qz['tags']) && ! empty($qz['tags']) ) {
+				$tags_block['topics'] = array_values( array_map('strval', $qz['tags']) );
+			}
+			if ( isset($qz['level']) && (string)$qz['level'] !== '' ) {
+				$tags_block['difficulty'] = (string) $qz['level'];
+			}
+			if ( isset($qz['group']) && (string)$qz['group'] !== '' ) {
+				$tags_block['audience'] = [ (string) $qz['group'] ];
+			}
+
+			$payload = [
+				'quiz'      => $quiz_block,
+				'questions' => $questions,
+			];
+
+			if ( $tags_block ) $payload['tags'] = $tags_block;
+
+			$payloads[] = $payload;
+			$log[] = "Converted ChatGPT schema quiz #".($qi+1)." → internal payload (base_exam_id={$base_exam_id}).";
+		}
+
+		return $payloads;
+	}
+
+	private static function import_one_payload( array $data, string $raw_one, array $plan, bool $is_dry, string $replace_mode, bool $cpt_enable, array &$log ) : array {
+		// Auto-clear reuse_questions_from whenever questions are provided on import (even if mode won't apply them)
+		$has_questions = isset($data['questions']) && is_array($data['questions']) && count($data['questions']) > 0;
+		if ( $has_questions ) {
+			$data['quiz']['reuse_questions_from'] = '';
+			if ( ! isset($data['quiz']['settings']) || ! is_array($data['quiz']['settings']) ) {
+				$data['quiz']['settings'] = [];
+			}
+			$data['quiz']['settings']['reuse_questions_from'] = '';
+		}
+
+		$quiz      = $data['quiz'];
+		$quiz_name = trim( (string) $quiz['name'] );
+		$log[]     = 'Quiz name: ' . $quiz_name;
+
+		$quiz_id = self::find_quiz_id_by_name( $quiz_name );
+
+		if ( $quiz_id ) $log[] = "Existing quiz found (ID={$quiz_id}).";
+		else $log[] = "No existing quiz found.";
+
+		if ( ! $quiz_id ) {
+			if ( $plan['needs_exam'] ) {
+				if ( ! $is_dry ) {
+					$quiz_id = self::insert_master( $quiz, $log );
+				} else {
+					$quiz_id = 0;
+					$log[] = '[Dry Run] Would insert new quiz master row.';
+				}
+			} else {
+				$log[] = "Mode '{$replace_mode}' does not create master quiz rows. Nothing to do without an existing quiz.";
+			}
+		}
+
+		if ( $quiz_id && $plan['update_master'] ) {
+			if ( ! $is_dry ) self::update_master( (int) $quiz_id, $quiz, $log );
+			else $log[] = '[Dry Run] Would update quiz master row.';
+		}
+
+		$questions = ( isset($data['questions']) && is_array($data['questions']) ) ? $data['questions'] : [];
+		$q_count = 0;
+		$a_count = 0;
+
+		if ( $quiz_id && $plan['replace_questions'] ) {
+			if ( ! $is_dry ) {
+				$log[] = "Replace questions enabled → delete existing questions/answers for quiz ID={$quiz_id}.";
+				self::delete_quiz_children( (int) $quiz_id, $log );
+			} else {
+				$log[] = '[Dry Run] Would delete existing questions/answers.';
+			}
+
+			foreach ( $questions as $i => $q ) {
+				$q_count++;
+				$sort_order = isset( $q['sort_order'] ) ? (int) $q['sort_order'] : ($i + 1);
+
+				$q = self::apply_safe_mappings_to_question( $q, $log );
+
+				if ( ! $is_dry ) $qid = self::insert_question( (int) $quiz_id, $q, $sort_order, $log );
+				else {
+					$qid = 0;
+					$log[] = "[Dry Run] Would insert question #{$q_count} (sort_order={$sort_order}, answer_type=" . (isset($q['answer_type']) ? $q['answer_type'] : '') . ").";
+				}
+
+				$answers = isset($q['answers']) && is_array($q['answers']) ? $q['answers'] : [];
+				foreach ( $answers as $j => $ans ) {
+					$a_count++;
+					$ans_sort = isset( $ans['sort_order'] ) ? (int) $ans['sort_order'] : ($j + 1);
+					if ( ! $is_dry ) self::insert_answer( (int) $qid, $ans, $ans_sort, $log );
+					else $log[] = "[Dry Run] Would insert answer (sort_order={$ans_sort}).";
+				}
+			}
+
+		} else {
+			if ( $plan['touch_questions'] ) $log[] = "Question import skipped (quiz missing or mode does not allow question changes).";
+			else $log[] = "No question changes in mode '{$replace_mode}'.";
+		}
+
+		$post_id = 0;
+		if ( $plan['sync_cpt'] ) {
+			if ( $cpt_enable ) {
+				if ( $is_dry ) {
+					$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
+				} else {
+					$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
+					if ( $post_id ) {
+						$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
+						self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+					}
+				}
+			} else {
+				$log[] = "CPT integration disabled by checkbox. Skipping CPT work.";
+			}
+		}
+
+		if ( $plan['apply_tags'] ) {
+			$tags = [];
+			if ( isset($data['tags']) && is_array($data['tags']) ) $tags = $data['tags'];
+			elseif ( isset($data['quiz']['tags']) && is_array($data['quiz']['tags']) ) $tags = $data['quiz']['tags'];
+
+			if ( $is_dry ) {
+				$log[] = '[Dry Run] Would apply tags to CPT post (topics/difficulty/audience).';
+			} else {
+				if ( ! $cpt_enable ) $log[] = "Tags mode requested but CPT integration checkbox is OFF. Cannot apply tags without a CPT post.";
+				elseif ( ! $post_id ) $log[] = "Tags mode requested but no CPT post_id available. Skipping tags.";
+				else self::apply_quiz_tags( (int) $post_id, $tags, $log );
+			}
+		}
+
+		return [ 'quiz_id' => (int)$quiz_id, 'post_id' => (int)$post_id, 'questions' => (int)$q_count, 'answers' => (int)$a_count ];
+	}
+
+
+	/** =========================
 	 * TAG APPLICATION (CPT taxonomies)
 	 * ========================= */
 	private static function apply_quiz_tags( int $post_id, array $tags, array &$log ) : void {
@@ -995,11 +1102,22 @@ class IKA_WatuPRO_Importer {
 			if ( empty( $q['question_html'] ) ) throw new Exception( "Question #".($idx+1)." missing question_html." );
 			if ( empty( $q['answer_type'] ) ) throw new Exception( "Question #".($idx+1)." missing answer_type." );
 			if ( empty( $q['answers'] ) || ! is_array( $q['answers'] ) ) throw new Exception( "Question #".($idx+1)." missing answers array." );
-			foreach ( $q['answers'] as $a ) {
-				if ( empty( $a['answer_html'] ) ) throw new Exception( "A question has an answer missing answer_html." );
+
+			// ✅ Required: exactly one explanation per question (stored in watupro_question.explain_answer)
+			if ( empty( $q['explain_answer_html'] ) ) {
+				throw new Exception( "Question #".($idx+1)." missing explain_answer_html (required)." );
+			}
+
+			foreach ( $q['answers'] as $aidx => $a ) {
+				if ( empty( $a['answer_html'] ) ) throw new Exception( "Question #".($idx+1)." answer #".($aidx+1)." missing answer_html." );
+				// 🚫 Disallow answer-level explanations (we use question-level only)
+				if ( isset($a['explanation_html']) && trim((string)$a['explanation_html']) !== '' ) {
+					throw new Exception( "Question #".($idx+1)." answer #".($aidx+1)." includes explanation_html. Use explain_answer_html at the question level only." );
+				}
 			}
 		}
 	}
+
 
 	private static function apply_safe_mappings_to_question( array $q, array &$log ) : array {
 		$raw_type = isset($q['answer_type']) ? strtolower(trim((string)$q['answer_type'])) : '';
@@ -1172,7 +1290,7 @@ class IKA_WatuPRO_Importer {
 			'correct'         => $correct ? '1' : '0',
 			'point'           => isset($ans['point']) ? (float) $ans['point'] : 0.00,
 			'sort_order'      => $sort_order,
-			'explanation'     => isset($ans['explanation_html']) ? wp_kses_post( (string) $ans['explanation_html'] ) : null,
+			'explanation'     => null, // locked: explanations are question-level only
 			'grade_id'        => '0',
 			'chk_group'       => 0,
 			'is_checked'      => 0,
