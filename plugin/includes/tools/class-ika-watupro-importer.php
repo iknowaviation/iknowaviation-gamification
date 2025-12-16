@@ -75,19 +75,10 @@ add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
 		$last = get_transient( 'ika_watupro_import_last_result' );
-		if ( $last ) {
-			delete_transient( 'ika_watupro_import_last_result' );
-		} else {
-			// Fallback: some hosts store transients in persistent object cache (not wp_options).
-			$last = get_option( 'ika_watupro_import_last_result_option' );
-		}
+		delete_transient( 'ika_watupro_import_last_result' );
 
 		$export_last = get_transient( 'ika_watupro_export_last_result' );
-		if ( $export_last ) {
-			delete_transient( 'ika_watupro_export_last_result' );
-		} else {
-			$export_last = get_option( 'ika_watupro_export_last_result_option' );
-		}
+		delete_transient( 'ika_watupro_export_last_result' );
 $quizzes = self::list_quizzes();
 		?>
 		<div class="wrap">
@@ -661,7 +652,7 @@ $quizzes = self::list_quizzes();
 	/** =========================
 	 * IMPORT
 	 * ========================= */
-public static function handle_import() {
+	public static function handle_import() {
 
 	// Always have a log array even if we fail early.
 	$log = [];
@@ -689,34 +680,16 @@ public static function handle_import() {
 		];
 
 		// Write both transient and option fallback.
-		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		set_transient( 'ika_watupro_import_last_result', $payload, 60 );
 		update_option( 'ika_watupro_import_last_result_option', $payload );
 	} );
+	// --- END FAIL-SAFE ---
 
-	// Debug marker + checkpoint (DB-backed) so we know the handler started.
-	$log[] = 'DEBUG: handle_import started';
-	update_option( 'ika_watupro_import_checkpoint', 'started ' . gmdate('c') );
-
-	// Also write a starter notice so you see *something* if we die later.
-	$starter = [
-		'ok'      => false,
-		'message' => 'DEBUG: handle_import started (if you later see a fatal, it happened after this point).',
-		'log'     => $log,
-		'ts'      => time(),
-	];
-	set_transient( 'ika_watupro_import_last_result', $starter, 300 );
-	update_option( 'ika_watupro_import_last_result_option', $starter );
-
-	// Permissions + nonce
-	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( 'Insufficient permissions.' );
-	}
+	if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
 	if ( empty( $_POST['ika_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ika_nonce'] ) ), 'ika_watupro_import' ) ) {
 		wp_die( 'Invalid nonce.' );
 	}
-
-	update_option( 'ika_watupro_import_checkpoint', 'passed_nonce ' . gmdate('c') );
 
 	$mode   = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'dry';
 	$is_dry = ( $mode !== 'import' );
@@ -736,56 +709,30 @@ public static function handle_import() {
 	global $wpdb;
 
 	try {
-		// File presence
-		if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) {
-			throw new Exception( 'No file uploaded.' );
-		}
+		if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) throw new Exception( 'No file uploaded.' );
 
-		update_option( 'ika_watupro_import_checkpoint', 'file_present ' . gmdate('c') );
-
-		// Read raw
 		$raw = file_get_contents( $_FILES['ika_json_file']['tmp_name'] );
-		if ( ! is_string( $raw ) || $raw === '' ) {
-			throw new Exception( 'Could not read uploaded file.' );
-		}
+		if ( ! is_string( $raw ) || $raw === '' ) throw new Exception( 'Could not read uploaded file.' );
 
-		update_option( 'ika_watupro_import_checkpoint', 'read_json ' . gmdate('c') );
-
-		// Decode
 		$data = json_decode( $raw, true );
-		if ( ! is_array( $data ) ) {
-			throw new Exception( 'Invalid JSON.' );
-		}
-
-		update_option( 'ika_watupro_import_checkpoint', 'decoded_json ' . gmdate('c') );
+		if ( ! is_array( $data ) ) throw new Exception( 'Invalid JSON.' );
 
 		// Normalize wrappers/case
-		if ( isset( $data['data'] ) && is_array( $data['data'] ) )       $data = $data['data'];
-		if ( isset( $data['payload'] ) && is_array( $data['payload'] ) ) $data = $data['payload'];
-		if ( ! isset( $data['questions'] ) && isset( $data['Questions'] ) ) $data['questions'] = $data['Questions'];
-		if ( ! isset( $data['quiz'] ) && isset( $data['Quiz'] ) )           $data['quiz'] = $data['Quiz'];
-
-		update_option( 'ika_watupro_import_checkpoint', 'normalized_root ' . gmdate('c') );
+		if ( isset($data['data']) && is_array($data['data']) )           $data = $data['data'];
+		if ( isset($data['payload']) && is_array($data['payload']) )     $data = $data['payload'];
+		if ( ! isset($data['questions']) && isset($data['Questions']) )  $data['questions'] = $data['Questions'];
+		if ( ! isset($data['quiz']) && isset($data['Quiz']) )            $data['quiz'] = $data['Quiz'];
 
 		// Convert locked ChatGPT schema v1.0 → one-or-more internal payloads
 		$payloads = self::expand_chatgpt_schema_to_payloads( $data, $log );
-		if ( ! is_array( $payloads ) || empty( $payloads ) ) {
-			throw new Exception( 'No quizzes found in JSON.' );
-		}
-
-		update_option( 'ika_watupro_import_checkpoint', 'expanded_payloads ' . gmdate('c') );
+		if ( ! is_array($payloads) || empty($payloads) ) throw new Exception( 'No quizzes found in JSON.' );
 
 		// Validate each payload for the selected replace mode
 		foreach ( $payloads as $pi => $p ) {
-			if ( ! is_array( $p ) ) {
-				throw new Exception( 'Invalid payload at index ' . $pi );
-			}
+			if ( ! is_array($p) ) throw new Exception( 'Invalid payload at index ' . $pi );
 			self::validate_payload_by_mode( $p, $replace_mode );
 		}
 
-		update_option( 'ika_watupro_import_checkpoint', 'validated_payloads ' . gmdate('c') );
-
-		// Transaction (real import only)
 		if ( ! $is_dry ) {
 			$wpdb->query( 'START TRANSACTION' );
 			$log[] = 'Started DB transaction.';
@@ -795,20 +742,14 @@ public static function handle_import() {
 		$total_questions = 0;
 		$total_answers   = 0;
 
-		update_option( 'ika_watupro_import_checkpoint', 'starting_import_loop ' . gmdate('c') );
-
 		foreach ( $payloads as $p ) {
 			$total_quizzes++;
-
-			update_option( 'ika_watupro_import_checkpoint', 'importing_payload ' . gmdate('c') );
-
 			$raw_one = wp_json_encode( $p, JSON_UNESCAPED_SLASHES );
 			if ( ! is_string( $raw_one ) ) $raw_one = '';
 
 			$res = self::import_one_payload( $p, $raw_one, $plan, $is_dry, $replace_mode, $cpt_enable, $log );
-
-			$total_questions += (int) ( $res['questions'] ?? 0 );
-			$total_answers   += (int) ( $res['answers'] ?? 0 );
+			$total_questions += (int) ($res['questions'] ?? 0);
+			$total_answers   += (int) ($res['answers'] ?? 0);
 		}
 
 		if ( ! $is_dry ) {
@@ -827,32 +768,24 @@ public static function handle_import() {
 			'ts'      => time(),
 		];
 
-		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		set_transient( 'ika_watupro_import_last_result', $payload, 60 );
 		update_option( 'ika_watupro_import_last_result_option', $payload );
 
-		update_option( 'ika_watupro_import_checkpoint', 'finished_success ' . gmdate('c') );
-
 	} catch ( Throwable $e ) {
-
-		// Rollback if needed
 		if ( ! empty( $wpdb ) && ! $is_dry ) {
 			$wpdb->query( 'ROLLBACK' );
 			$log[] = 'Rolled back DB transaction.';
 		}
 
-		$log[] = 'ERROR: ' . $e->getMessage();
-
 		$payload = [
 			'ok'      => false,
 			'message' => $e->getMessage(),
-			'log'     => $log,
+			'log'     => array_merge( $log, [ 'ERROR: ' . $e->getMessage() ] ),
 			'ts'      => time(),
 		];
 
-		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		set_transient( 'ika_watupro_import_last_result', $payload, 60 );
 		update_option( 'ika_watupro_import_last_result_option', $payload );
-
-		update_option( 'ika_watupro_import_checkpoint', 'failed ' . gmdate('c') );
 	}
 
 	wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
@@ -1639,7 +1572,6 @@ public static function handle_import() {
 		$quiz_id = isset($_POST['quiz_id']) ? (int) $_POST['quiz_id'] : 0;
 		if ( ! $quiz_id ) {
 			set_transient( 'ika_watupro_export_last_result', [ 'ok' => false, 'message' => 'No quiz selected.' ], 60 );
-			update_option( 'ika_watupro_export_last_result_option', array_merge( [ 'ok' => false, 'message' => 'No quiz selected.' ], [ 'ts' => time() ] ) );
 			wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
 			exit;
 		}
@@ -1658,7 +1590,6 @@ public static function handle_import() {
 
 		} catch ( Exception $e ) {
 			set_transient( 'ika_watupro_export_last_result', [ 'ok' => false, 'message' => $e->getMessage() ], 60 );
-			update_option( 'ika_watupro_export_last_result_option', array_merge( [ 'ok' => false, 'message' => $e->getMessage() ], [ 'ts' => time() ] ) );
 			wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
 			exit;
 		}
