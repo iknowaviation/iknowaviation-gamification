@@ -36,9 +36,7 @@ class IKA_WatuPRO_Importer {
 	private static function t_answer()   { global $wpdb; return $wpdb->prefix . 'watupro_answer'; }
 
 	public static function init() {
-		add_action( 'admin_post_ika_watupro_ping', [ __CLASS__, 'handle_ping' ] );
-
-		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
+add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 		add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
 		add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
 
@@ -46,17 +44,6 @@ class IKA_WatuPRO_Importer {
 		add_action( 'admin_post_ika_watupro_build_json', [ __CLASS__, 'handle_builder_generate_json' ] );
 	}
 
-	public static function handle_ping() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( 'PING FAIL: permissions' );
-		}
-
-		wp_die( 'PING OK: admin-post handler executed.' );
-		
-		if ( empty($_POST['ika_ping_nonce']) || ! wp_verify_nonce( sanitize_text_field(wp_unslash($_POST['ika_ping_nonce'])), 'ika_watupro_ping' ) ) {
-			wp_die('PING FAIL: invalid nonce');
-		}
-	}
 
 
 	public static function add_menu() {
@@ -84,26 +71,28 @@ class IKA_WatuPRO_Importer {
 	 * IMPORTER / EXPORTER PAGE
 	 * ========================= */
 	public static function render_page() {
+
 		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
 
 		$last = get_transient( 'ika_watupro_import_last_result' );
-		delete_transient( 'ika_watupro_import_last_result' );
+		if ( $last ) {
+			delete_transient( 'ika_watupro_import_last_result' );
+		} else {
+			// Fallback: some hosts store transients in persistent object cache (not wp_options).
+			$last = get_option( 'ika_watupro_import_last_result_option' );
+		}
 
 		$export_last = get_transient( 'ika_watupro_export_last_result' );
-		delete_transient( 'ika_watupro_export_last_result' );
-
-		
-		$ck = get_transient( 'ika_watupro_cpt_last_checkpoint' );
+		if ( $export_last ) {
+			delete_transient( 'ika_watupro_export_last_result' );
+		} else {
+			$export_last = get_option( 'ika_watupro_export_last_result_option' );
+		}
 $quizzes = self::list_quizzes();
 		?>
 		<div class="wrap">
 			<h1>WatuPRO Importer / Exporter (JSON)</h1>
 
-<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" style="margin:10px 0;">
-  <input type="hidden" name="action" value="ika_watupro_ping">
-  <?php wp_nonce_field( 'ika_watupro_ping', 'ika_ping_nonce' ); ?>
-  <button class="button button-secondary">Ping importer handler (POST)</button>
-</form>
 			<?php if ( $last ) : ?>
 				<div class="notice notice-<?php echo esc_attr( $last['ok'] ? 'success' : 'error' ); ?>">
 					<p><strong><?php echo esc_html( $last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $last['message'] ); ?></p>
@@ -121,15 +110,7 @@ $quizzes = self::list_quizzes();
 					<p><strong><?php echo esc_html( $export_last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $export_last['message'] ); ?></p>
 				</div>
 			<?php endif; ?>
-			<?php if ( ! empty( $ck ) && ! empty( $ck['msg'] ) ) : ?>
-				<div class="notice notice-warning">
-					<p><strong>Last CPT checkpoint:</strong> <?php echo esc_html( $ck['msg'] ); ?></p>
-				</div>
-			<?php endif; ?>
-
-
-
-			<hr />
+<hr />
 
 			<h2>Import JSON</h2>
 			<p><strong>Tip:</strong> Run Dry Run first. Then Import.</p>
@@ -680,133 +661,203 @@ $quizzes = self::list_quizzes();
 	/** =========================
 	 * IMPORT
 	 * ========================= */
-	public static function handle_import() {
-		// --- HARD FAIL-SAFE: capture fatal errors and surface them in the importer notice ---
-			register_shutdown_function( function() {
-				$e = error_get_last();
-				if ( ! $e ) return;
+public static function handle_import() {
 
-				$fatal_types = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ];
-				if ( ! in_array( $e['type'], $fatal_types, true ) ) return;
+	// Always have a log array even if we fail early.
+	$log = [];
 
-				$msg = sprintf(
-					'FATAL captured: %s in %s on line %d',
-					$e['message'] ?? '(no message)',
-					$e['file'] ?? '(unknown file)',
-					(int) ( $e['line'] ?? 0 )
-				);
+	// --- HARD FAIL-SAFE: capture fatal errors and surface them in the importer notice ---
+	register_shutdown_function( function() use ( &$log ) {
+		$e = error_get_last();
+		if ( ! $e ) return;
 
-				// If the normal result transient wasn't written, write it now so the importer page shows *something*.
-				set_transient( 'ika_watupro_import_last_result', [
-					'ok'      => false,
-					'message' => $msg,
-					'log'     => [ $msg ],
-				], 300 );
-			} );
+		$fatal_types = [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR ];
+		if ( ! in_array( $e['type'], $fatal_types, true ) ) return;
 
-			// Also drop a "started" marker so we know handle_import was reached at all.
-			set_transient( 'ika_watupro_import_last_result', [
-				'ok'      => false,
-				'message' => 'DEBUG: handle_import started (if you later see a fatal, it happened after this point).',
-				'log'     => [ 'DEBUG: handle_import started' ],
-			], 300 );
-			// --- END FAIL-SAFE ---
+		$msg = sprintf(
+			'FATAL captured: %s in %s on line %d',
+			$e['message'] ?? '(no message)',
+			$e['file'] ?? '(unknown file)',
+			(int) ( $e['line'] ?? 0 )
+		);
 
-		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
-
-		if ( empty( $_POST['ika_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ika_nonce'] ) ), 'ika_watupro_import' ) ) {
-			wp_die( 'Invalid nonce.' );
-		}
-
-		$mode   = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'dry';
-		$is_dry = ( $mode !== 'import' );
-
-		$replace_existing = ! empty( $_POST['replace_existing'] );
-		$cpt_enable       = ! empty( $_POST['cpt_enable'] );
-
-		$raw_replace_mode = isset( $_POST['replace_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['replace_mode'] ) ) : 'auto';
-		$replace_mode     = self::normalize_replace_mode( $raw_replace_mode, $replace_existing );
-
-		$plan = self::replace_plan( $replace_mode, $cpt_enable );
-
-		$log = [];		
-		$log[] = "Replace mode: {$replace_mode}";
-		
-		// DEBUG marker so we always know the handler completed enough to reach this point.
-		set_transient( 'ika_watupro_import_last_result', [
+		$payload = [
 			'ok'      => false,
-			'message' => 'DEBUG: handle_import reached (if this is the only message, the request died later).',
-			'log'     => $log,
-		], 300 );
+			'message' => $msg,
+			'log'     => array_merge( $log ?: [], [ $msg ] ),
+			'ts'      => time(),
+		];
 
-		try {
-			if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) throw new Exception( 'No file uploaded.' );
+		// Write both transient and option fallback.
+		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		update_option( 'ika_watupro_import_last_result_option', $payload );
+	} );
 
-			$raw = file_get_contents( $_FILES['ika_json_file']['tmp_name'] );
-			if ( ! $raw ) throw new Exception( 'Could not read uploaded file.' );
+	// Debug marker + checkpoint (DB-backed) so we know the handler started.
+	$log[] = 'DEBUG: handle_import started';
+	update_option( 'ika_watupro_import_checkpoint', 'started ' . gmdate('c') );
 
-			$data = json_decode( $raw, true );
-			if ( ! is_array( $data ) ) throw new Exception( 'Invalid JSON.' );
+	// Also write a starter notice so you see *something* if we die later.
+	$starter = [
+		'ok'      => false,
+		'message' => 'DEBUG: handle_import started (if you later see a fatal, it happened after this point).',
+		'log'     => $log,
+		'ts'      => time(),
+	];
+	set_transient( 'ika_watupro_import_last_result', $starter, 300 );
+	update_option( 'ika_watupro_import_last_result_option', $starter );
 
-			// Normalize wrappers/case
-			if ( isset($data['data']) && is_array($data['data']) )           $data = $data['data'];
-			if ( isset($data['payload']) && is_array($data['payload']) )     $data = $data['payload'];
-			if ( ! isset($data['questions']) && isset($data['Questions']) )  $data['questions'] = $data['Questions'];
-			if ( ! isset($data['quiz']) && isset($data['Quiz']) )            $data['quiz'] = $data['Quiz'];
+	// Permissions + nonce
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'Insufficient permissions.' );
+	}
 
-			// Convert locked ChatGPT schema v1.0 → one-or-more internal payloads
-			$payloads = self::expand_chatgpt_schema_to_payloads( $data, $log );
-			if ( ! is_array($payloads) || empty($payloads) ) throw new Exception( 'No quizzes found in JSON.' );
+	if ( empty( $_POST['ika_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['ika_nonce'] ) ), 'ika_watupro_import' ) ) {
+		wp_die( 'Invalid nonce.' );
+	}
 
-			// Validate each payload for the selected replace mode
-			foreach ( $payloads as $pi => $p ) {
-				if ( ! is_array($p) ) throw new Exception( 'Invalid payload at index ' . $pi );
-				self::validate_payload_by_mode( $p, $replace_mode );
-			}
+	update_option( 'ika_watupro_import_checkpoint', 'passed_nonce ' . gmdate('c') );
 
-			global $wpdb;
-			if ( ! $is_dry ) $wpdb->query( 'START TRANSACTION' );
+	$mode   = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'dry';
+	$is_dry = ( $mode !== 'import' );
 
-			$total_quizzes   = 0;
-			$total_questions = 0;
-			$total_answers   = 0;
+	$replace_existing = ! empty( $_POST['replace_existing'] );
+	$cpt_enable       = ! empty( $_POST['cpt_enable'] );
 
-			foreach ( $payloads as $p ) {
-				$total_quizzes++;
-				$raw_one = wp_json_encode( $p, JSON_UNESCAPED_SLASHES );
-				$res = self::import_one_payload( $p, $raw_one, $plan, $is_dry, $replace_mode, $cpt_enable, $log );
-				$total_questions += (int) ($res['questions'] ?? 0);
-				$total_answers   += (int) ($res['answers'] ?? 0);
-			}
+	$raw_replace_mode = isset( $_POST['replace_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['replace_mode'] ) ) : 'auto';
+	$replace_mode     = self::normalize_replace_mode( $raw_replace_mode, $replace_existing );
 
-			if ( ! $is_dry ) $wpdb->query( 'COMMIT' );
+	$plan = self::replace_plan( $replace_mode, $cpt_enable );
 
-			$msg = $is_dry
-				? "Dry Run complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}."
-				: "Import complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}.";
+	$log[] = "Replace mode: {$replace_mode}";
+	$log[] = "Mode: " . ( $is_dry ? 'dry' : 'import' );
+	$log[] = "CPT enabled: " . ( $cpt_enable ? 'yes' : 'no' );
 
-			set_transient( 'ika_watupro_import_last_result', [
-				'ok'      => true,
-				'message' => $msg,
-				'log'     => $log,
-			], 60 );
+	global $wpdb;
 
-		} catch ( Throwable $e ) {
-			global $wpdb;
-			if ( ! empty( $wpdb ) && ! $is_dry ) {
-				$wpdb->query( 'ROLLBACK' );
-			}
-
-			set_transient( 'ika_watupro_import_last_result', [
-				'ok'      => false,
-				'message' => $e->getMessage(),
-				'log'     => $log,
-			], 60 );
+	try {
+		// File presence
+		if ( empty( $_FILES['ika_json_file']['tmp_name'] ) ) {
+			throw new Exception( 'No file uploaded.' );
 		}
 
-		wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
-		exit;
+		update_option( 'ika_watupro_import_checkpoint', 'file_present ' . gmdate('c') );
+
+		// Read raw
+		$raw = file_get_contents( $_FILES['ika_json_file']['tmp_name'] );
+		if ( ! is_string( $raw ) || $raw === '' ) {
+			throw new Exception( 'Could not read uploaded file.' );
+		}
+
+		update_option( 'ika_watupro_import_checkpoint', 'read_json ' . gmdate('c') );
+
+		// Decode
+		$data = json_decode( $raw, true );
+		if ( ! is_array( $data ) ) {
+			throw new Exception( 'Invalid JSON.' );
+		}
+
+		update_option( 'ika_watupro_import_checkpoint', 'decoded_json ' . gmdate('c') );
+
+		// Normalize wrappers/case
+		if ( isset( $data['data'] ) && is_array( $data['data'] ) )       $data = $data['data'];
+		if ( isset( $data['payload'] ) && is_array( $data['payload'] ) ) $data = $data['payload'];
+		if ( ! isset( $data['questions'] ) && isset( $data['Questions'] ) ) $data['questions'] = $data['Questions'];
+		if ( ! isset( $data['quiz'] ) && isset( $data['Quiz'] ) )           $data['quiz'] = $data['Quiz'];
+
+		update_option( 'ika_watupro_import_checkpoint', 'normalized_root ' . gmdate('c') );
+
+		// Convert locked ChatGPT schema v1.0 → one-or-more internal payloads
+		$payloads = self::expand_chatgpt_schema_to_payloads( $data, $log );
+		if ( ! is_array( $payloads ) || empty( $payloads ) ) {
+			throw new Exception( 'No quizzes found in JSON.' );
+		}
+
+		update_option( 'ika_watupro_import_checkpoint', 'expanded_payloads ' . gmdate('c') );
+
+		// Validate each payload for the selected replace mode
+		foreach ( $payloads as $pi => $p ) {
+			if ( ! is_array( $p ) ) {
+				throw new Exception( 'Invalid payload at index ' . $pi );
+			}
+			self::validate_payload_by_mode( $p, $replace_mode );
+		}
+
+		update_option( 'ika_watupro_import_checkpoint', 'validated_payloads ' . gmdate('c') );
+
+		// Transaction (real import only)
+		if ( ! $is_dry ) {
+			$wpdb->query( 'START TRANSACTION' );
+			$log[] = 'Started DB transaction.';
+		}
+
+		$total_quizzes   = 0;
+		$total_questions = 0;
+		$total_answers   = 0;
+
+		update_option( 'ika_watupro_import_checkpoint', 'starting_import_loop ' . gmdate('c') );
+
+		foreach ( $payloads as $p ) {
+			$total_quizzes++;
+
+			update_option( 'ika_watupro_import_checkpoint', 'importing_payload ' . gmdate('c') );
+
+			$raw_one = wp_json_encode( $p, JSON_UNESCAPED_SLASHES );
+			if ( ! is_string( $raw_one ) ) $raw_one = '';
+
+			$res = self::import_one_payload( $p, $raw_one, $plan, $is_dry, $replace_mode, $cpt_enable, $log );
+
+			$total_questions += (int) ( $res['questions'] ?? 0 );
+			$total_answers   += (int) ( $res['answers'] ?? 0 );
+		}
+
+		if ( ! $is_dry ) {
+			$wpdb->query( 'COMMIT' );
+			$log[] = 'Committed DB transaction.';
+		}
+
+		$msg = $is_dry
+			? "Dry Run complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}."
+			: "Import complete: {$total_quizzes} quiz(es), {$total_questions} question(s), {$total_answers} answer(s). Mode={$replace_mode}.";
+
+		$payload = [
+			'ok'      => true,
+			'message' => $msg,
+			'log'     => $log,
+			'ts'      => time(),
+		];
+
+		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		update_option( 'ika_watupro_import_last_result_option', $payload );
+
+		update_option( 'ika_watupro_import_checkpoint', 'finished_success ' . gmdate('c') );
+
+	} catch ( Throwable $e ) {
+
+		// Rollback if needed
+		if ( ! empty( $wpdb ) && ! $is_dry ) {
+			$wpdb->query( 'ROLLBACK' );
+			$log[] = 'Rolled back DB transaction.';
+		}
+
+		$log[] = 'ERROR: ' . $e->getMessage();
+
+		$payload = [
+			'ok'      => false,
+			'message' => $e->getMessage(),
+			'log'     => $log,
+			'ts'      => time(),
+		];
+
+		set_transient( 'ika_watupro_import_last_result', $payload, 300 );
+		update_option( 'ika_watupro_import_last_result_option', $payload );
+
+		update_option( 'ika_watupro_import_checkpoint', 'failed ' . gmdate('c') );
 	}
+
+	wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
+	exit;
+}
 
 	/** =========================
 	 * SELECTIVE REPLACE: MODE + PLAN
@@ -1399,108 +1450,156 @@ $quizzes = self::list_quizzes();
 	 * - Always attach exam_id meta for stability
 	 */
 	
-	private static function cpt_checkpoint( string $msg, array &$log ) : void {
-		$log[] = '[CPT] ' . $msg;
-		set_transient( 'ika_watupro_cpt_last_checkpoint', [
-			'time' => time(),
-			'msg'  => $msg,
-		], 300 );
-	}
-private static function with_temporarily_disabled_post_hooks( callable $callback ) {
-		// Some sites have aggressive save_post / transition hooks that can fatal during imports.
-		// We temporarily disable a few common hook points, then restore them after the callback.
-		global $wp_filter;
 
-		$keys = [ 'save_post', 'wp_insert_post', 'transition_post_status' ];
-		$backup = [];
 
-		foreach ( $keys as $k ) {
-			$backup[ $k ] = $wp_filter[ $k ] ?? null;
-			if ( isset( $wp_filter[ $k ] ) ) {
-				unset( $wp_filter[ $k ] );
-			}
-		}
-
-		try {
-			return $callback();
-		} finally {
-			// Restore hooks
-			foreach ( $keys as $k ) {
-				if ( array_key_exists( $k, $backup ) && $backup[ $k ] !== null ) {
-					$wp_filter[ $k ] = $backup[ $k ];
-				} else {
-					unset( $wp_filter[ $k ] );
-				}
-			}
-		}
-	}
-
-private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
-		self::cpt_checkpoint( "Entered upsert_quiz_cpt_post(exam_id={$exam_id})", $log );
+	private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
+		global $wpdb;
 
 		$post_type = self::CPT_POST_TYPE;
+
 		if ( ! post_type_exists( $post_type ) ) {
-			self::cpt_checkpoint( "post_type '{$post_type}' does not exist", $log );
+			$log[] = "CPT sync skipped: post_type '{$post_type}' does not exist.";
 			return 0;
 		}
 
 		$title   = sanitize_text_field( (string) ( $quiz['name'] ?? '' ) );
 		$content = '[watupro ' . (int) $exam_id . ']';
+		$status  = 'publish'; // Requested: create posts as publish.
 
-		self::cpt_checkpoint( 'Looking for existing CPT post by exam_id meta', $log );
+		// Find existing CPT post by exam_id meta (direct DB to avoid hooks)
+		$pm = $wpdb->postmeta;
+		$pp = $wpdb->posts;
 
-		$existing = get_posts( [
-			'post_type'      => $post_type,
-			'post_status'    => 'any',
-			'posts_per_page' => 1,
-			'meta_key'       => self::CPT_META_EXAM_ID,
-			'meta_value'     => $exam_id,
-			'fields'         => 'ids',
-		] );
+		$existing_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT p.ID
+				 FROM {$pp} p
+				 INNER JOIN {$pm} m ON m.post_id = p.ID
+				 WHERE p.post_type = %s
+				   AND m.meta_key = %s
+				   AND m.meta_value = %s
+				 ORDER BY p.ID DESC
+				 LIMIT 1",
+				$post_type,
+				self::CPT_META_EXAM_ID,
+				(string) $exam_id
+			)
+		);
 
-		$existing_id = ! empty( $existing ) ? (int) $existing[0] : 0;
-		self::cpt_checkpoint( $existing_id ? "Found existing post_id={$existing_id}" : 'No existing post found', $log );
+		$now_local = current_time( 'mysql' );
+		$now_gmt   = current_time( 'mysql', 1 );
+		$author_id = get_current_user_id();
+		if ( ! $author_id ) $author_id = 1;
 
-		// Use draft to avoid publish-time hooks from other plugins/themes.
-		$postarr = [
-			'ID'           => $existing_id,
-			'post_type'    => $post_type,
-			'post_status'  => 'draft',
-			'post_title'   => $title,
-			'post_content' => $content,
-		];
+		if ( $existing_id > 0 ) {
+			// Update wp_posts directly (bypass wp_update_post hooks)
+			$ok = $wpdb->update(
+				$pp,
+				[
+					'post_title'        => $title,
+					'post_content'      => $content,
+					'post_status'       => $status,
+					'post_modified'     => $now_local,
+					'post_modified_gmt' => $now_gmt,
+				],
+				[ 'ID' => $existing_id ],
+				[ '%s','%s','%s','%s','%s' ],
+				[ '%d' ]
+			);
 
-		if ( $existing_id ) {
-			self::cpt_checkpoint( "Calling wp_update_post(post_id={$existing_id})", $log );
-			$post_id = self::with_temporarily_disabled_post_hooks( function() use ( $postarr ) {
-				return wp_update_post( $postarr, true );
-			} );
-			self::cpt_checkpoint( 'Returned from wp_update_post()', $log );
-
-			if ( is_wp_error( $post_id ) ) {
-				throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
+			if ( $ok === false ) {
+				throw new Exception( 'CPT DB update failed: ' . $wpdb->last_error );
 			}
-			$log[] = "Updated CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
+
+			$post_id = $existing_id;
+			$log[] = "Updated CPT post ID={$post_id} via direct DB (forced content: [watupro {$exam_id}]).";
 		} else {
-			self::cpt_checkpoint( 'Calling wp_insert_post()', $log );
-			$post_id = self::with_temporarily_disabled_post_hooks( function() use ( $postarr ) {
-				return wp_insert_post( $postarr, true );
-			} );
-			self::cpt_checkpoint( 'Returned from wp_insert_post()', $log );
+			// Insert wp_posts directly (bypass wp_insert_post hooks)
+			$ins = $wpdb->insert(
+				$pp,
+				[
+					'post_author'       => $author_id,
+					'post_date'         => $now_local,
+					'post_date_gmt'     => $now_gmt,
+					'post_content'      => $content,
+					'post_title'        => $title,
+					'post_status'       => $status,
+					'comment_status'    => 'closed',
+					'ping_status'       => 'closed',
+					'post_name'         => '', // optional: leave blank; WP will generate if you edit later
+					'post_modified'     => $now_local,
+					'post_modified_gmt' => $now_gmt,
+					'post_type'         => $post_type,
+				],
+				[ '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' ]
+			);
 
-			if ( is_wp_error( $post_id ) ) {
-				throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
+			if ( $ins === false ) {
+				throw new Exception( 'CPT DB insert failed: ' . $wpdb->last_error );
 			}
-			$log[] = "Created CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
+
+			$post_id = (int) $wpdb->insert_id;
+
+			// Set a reasonable GUID (not critical, but helps consistency).
+			$guid = home_url( '/?post_type=' . $post_type . '&p=' . $post_id );
+			$wpdb->update(
+				$pp,
+				[ 'guid' => $guid ],
+				[ 'ID' => $post_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+
+			$log[] = "Created CPT post ID={$post_id} via direct DB (forced content: [watupro {$exam_id}]).";
 		}
 
-		self::cpt_checkpoint( 'Updating post meta', $log );
-		update_post_meta( (int) $post_id, self::CPT_META_EXAM_ID, $exam_id );
-		update_post_meta( (int) $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', (string) $raw_json ) );
+		// Upsert post meta directly (avoid update_post_meta hooks)
+		self::upsert_postmeta_db( $post_id, self::CPT_META_EXAM_ID, (string) $exam_id );
+		self::upsert_postmeta_db( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', $raw_json ) );
 
-		self::cpt_checkpoint( "Done upsert_quiz_cpt_post(post_id={$post_id})", $log );
+		if ( function_exists( 'clean_post_cache' ) ) {
+			clean_post_cache( $post_id );
+		}
+
 		return (int) $post_id;
 	}
+
+	private static function upsert_postmeta_db( int $post_id, string $meta_key, string $meta_value ) : void {
+		global $wpdb;
+
+		$pm = $wpdb->postmeta;
+
+		$meta_id = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT meta_id FROM {$pm} WHERE post_id = %d AND meta_key = %s LIMIT 1",
+				$post_id,
+				$meta_key
+			)
+		);
+
+		if ( $meta_id > 0 ) {
+			$ok = $wpdb->update(
+				$pm,
+				[ 'meta_value' => $meta_value ],
+				[ 'meta_id' => $meta_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+			if ( $ok === false ) {
+				throw new Exception( 'Postmeta DB update failed (' . $meta_key . '): ' . $wpdb->last_error );
+			}
+		} else {
+			$ok = $wpdb->insert(
+				$pm,
+				[ 'post_id' => $post_id, 'meta_key' => $meta_key, 'meta_value' => $meta_value ],
+				[ '%d','%s','%s' ]
+			);
+			if ( $ok === false ) {
+				throw new Exception( 'Postmeta DB insert failed (' . $meta_key . '): ' . $wpdb->last_error );
+			}
+		}
+	}
+
 
 
 	private static function cpt_health_check( int $post_id, int $exam_id, array &$log ) : void {
@@ -1540,6 +1639,7 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 		$quiz_id = isset($_POST['quiz_id']) ? (int) $_POST['quiz_id'] : 0;
 		if ( ! $quiz_id ) {
 			set_transient( 'ika_watupro_export_last_result', [ 'ok' => false, 'message' => 'No quiz selected.' ], 60 );
+			update_option( 'ika_watupro_export_last_result_option', array_merge( [ 'ok' => false, 'message' => 'No quiz selected.' ], [ 'ts' => time() ] ) );
 			wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
 			exit;
 		}
@@ -1558,6 +1658,7 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 
 		} catch ( Exception $e ) {
 			set_transient( 'ika_watupro_export_last_result', [ 'ok' => false, 'message' => $e->getMessage() ], 60 );
+			update_option( 'ika_watupro_export_last_result_option', array_merge( [ 'ok' => false, 'message' => $e->getMessage() ], [ 'ts' => time() ] ) );
 			wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
 			exit;
 		}
@@ -1655,5 +1756,3 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 }
 
 IKA_WatuPRO_Importer::init();
-add_action( 'admin_post_ika_watupro_ping', [ 'IKA_WatuPRO_Importer', 'handle_ping' ] );
-
