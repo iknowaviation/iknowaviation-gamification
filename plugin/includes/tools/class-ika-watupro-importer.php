@@ -36,12 +36,27 @@ class IKA_WatuPRO_Importer {
 	private static function t_answer()   { global $wpdb; return $wpdb->prefix . 'watupro_answer'; }
 
 	public static function init() {
+		add_action( 'admin_post_ika_watupro_ping', [ __CLASS__, 'handle_ping' ] );
+
 		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 		add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
 		add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
 
 		// NEW: Builder JSON generator
 		add_action( 'admin_post_ika_watupro_build_json', [ __CLASS__, 'handle_builder_generate_json' ] );
+	}
+
+	public static function handle_ping() {
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
+
+		set_transient( 'ika_watupro_import_last_result', [
+			'ok'      => true,
+			'message' => 'PING OK: admin-post handler executed.',
+			'log'     => [ 'Ping reached at ' . gmdate('c') ],
+		], 300 );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
+		exit;
 	}
 
 	public static function add_menu() {
