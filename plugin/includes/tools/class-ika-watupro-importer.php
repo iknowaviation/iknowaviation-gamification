@@ -1406,19 +1406,39 @@ $quizzes = self::list_quizzes();
 			'msg'  => $msg,
 		], 300 );
 	}
-private static function with_disabled_post_hooks( callable $callback ) {
-	// Disable common heavy hooks
-	remove_all_actions( 'save_post' );
-	remove_all_actions( 'wp_insert_post' );
-	remove_all_actions( 'transition_post_status' );
+private static function with_temporarily_disabled_post_hooks( callable $callback ) {
+		// Some sites have aggressive save_post / transition hooks that can fatal during imports.
+		// We temporarily disable a few common hook points, then restore them after the callback.
+		global $wp_filter;
 
-	return $callback();
-}
+		$keys = [ 'save_post', 'wp_insert_post', 'transition_post_status' ];
+		$backup = [];
+
+		foreach ( $keys as $k ) {
+			$backup[ $k ] = $wp_filter[ $k ] ?? null;
+			if ( isset( $wp_filter[ $k ] ) ) {
+				unset( $wp_filter[ $k ] );
+			}
+		}
+
+		try {
+			return $callback();
+		} finally {
+			// Restore hooks
+			foreach ( $keys as $k ) {
+				if ( array_key_exists( $k, $backup ) && $backup[ $k ] !== null ) {
+					$wp_filter[ $k ] = $backup[ $k ];
+				} else {
+					unset( $wp_filter[ $k ] );
+				}
+			}
+		}
+	}
+
 private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
 		self::cpt_checkpoint( "Entered upsert_quiz_cpt_post(exam_id={$exam_id})", $log );
 
 		$post_type = self::CPT_POST_TYPE;
-
 		if ( ! post_type_exists( $post_type ) ) {
 			self::cpt_checkpoint( "post_type '{$post_type}' does not exist", $log );
 			return 0;
@@ -1441,6 +1461,7 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 		$existing_id = ! empty( $existing ) ? (int) $existing[0] : 0;
 		self::cpt_checkpoint( $existing_id ? "Found existing post_id={$existing_id}" : 'No existing post found', $log );
 
+		// Use draft to avoid publish-time hooks from other plugins/themes.
 		$postarr = [
 			'ID'           => $existing_id,
 			'post_type'    => $post_type,
@@ -1451,31 +1472,31 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 
 		if ( $existing_id ) {
 			self::cpt_checkpoint( "Calling wp_update_post(post_id={$existing_id})", $log );
-			$post_id = self::with_disabled_post_hooks( function() use ( $postarr ) {
-	return wp_insert_post( $postarr, true );
-});
-
-			
+			$post_id = self::with_temporarily_disabled_post_hooks( function() use ( $postarr ) {
+				return wp_update_post( $postarr, true );
+			} );
 			self::cpt_checkpoint( 'Returned from wp_update_post()', $log );
 
-			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
+			if ( is_wp_error( $post_id ) ) {
+				throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
+			}
 			$log[] = "Updated CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		} else {
 			self::cpt_checkpoint( 'Calling wp_insert_post()', $log );
-			$post_id = wp_insert_post( $postarr, true );
-			$post_id = self::with_disabled_post_hooks( function() use ( $postarr ) {
-	return wp_insert_post( $postarr, true );
-});
-
+			$post_id = self::with_temporarily_disabled_post_hooks( function() use ( $postarr ) {
+				return wp_insert_post( $postarr, true );
+			} );
 			self::cpt_checkpoint( 'Returned from wp_insert_post()', $log );
 
-			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
+			if ( is_wp_error( $post_id ) ) {
+				throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
+			}
 			$log[] = "Created CPT post ID={$post_id} (forced content: [watupro {$exam_id}]).";
 		}
 
 		self::cpt_checkpoint( 'Updating post meta', $log );
-		update_post_meta( $post_id, self::CPT_META_EXAM_ID, $exam_id );
-		update_post_meta( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', (string) $raw_json ) );
+		update_post_meta( (int) $post_id, self::CPT_META_EXAM_ID, $exam_id );
+		update_post_meta( (int) $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', (string) $raw_json ) );
 
 		self::cpt_checkpoint( "Done upsert_quiz_cpt_post(post_id={$post_id})", $log );
 		return (int) $post_id;
