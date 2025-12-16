@@ -47,17 +47,17 @@ class IKA_WatuPRO_Importer {
 	}
 
 	public static function handle_ping() {
-		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'PING FAIL: permissions' );
+		}
 
-		set_transient( 'ika_watupro_import_last_result', [
-			'ok'      => true,
-			'message' => 'PING OK: admin-post handler executed.',
-			'log'     => [ 'Ping reached at ' . gmdate('c') ],
-		], 300 );
-
-		wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
-		exit;
+		wp_die( 'PING OK: admin-post handler executed.' );
+		
+		if ( empty($_POST['ika_ping_nonce']) || ! wp_verify_nonce( sanitize_text_field(wp_unslash($_POST['ika_ping_nonce'])), 'ika_watupro_ping' ) ) {
+			wp_die('PING FAIL: invalid nonce');
+		}
 	}
+
 
 	public static function add_menu() {
 		add_submenu_page(
@@ -99,6 +99,11 @@ $quizzes = self::list_quizzes();
 		<div class="wrap">
 			<h1>WatuPRO Importer / Exporter (JSON)</h1>
 
+<form method="post" action="<?php echo esc_url( admin_url('admin-post.php') ); ?>" style="margin:10px 0;">
+  <input type="hidden" name="action" value="ika_watupro_ping">
+  <?php wp_nonce_field( 'ika_watupro_ping', 'ika_ping_nonce' ); ?>
+  <button class="button button-secondary">Ping importer handler (POST)</button>
+</form>
 			<?php if ( $last ) : ?>
 				<div class="notice notice-<?php echo esc_attr( $last['ok'] ? 'success' : 'error' ); ?>">
 					<p><strong><?php echo esc_html( $last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $last['message'] ); ?></p>
@@ -1401,7 +1406,14 @@ $quizzes = self::list_quizzes();
 			'msg'  => $msg,
 		], 300 );
 	}
+private static function with_disabled_post_hooks( callable $callback ) {
+	// Disable common heavy hooks
+	remove_all_actions( 'save_post' );
+	remove_all_actions( 'wp_insert_post' );
+	remove_all_actions( 'transition_post_status' );
 
+	return $callback();
+}
 private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
 		self::cpt_checkpoint( "Entered upsert_quiz_cpt_post(exam_id={$exam_id})", $log );
 
@@ -1432,14 +1444,18 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 		$postarr = [
 			'ID'           => $existing_id,
 			'post_type'    => $post_type,
-			'post_status'  => 'publish',
+			'post_status'  => 'draft',
 			'post_title'   => $title,
 			'post_content' => $content,
 		];
 
 		if ( $existing_id ) {
 			self::cpt_checkpoint( "Calling wp_update_post(post_id={$existing_id})", $log );
-			$post_id = wp_update_post( $postarr, true );
+			$post_id = self::with_disabled_post_hooks( function() use ( $postarr ) {
+	return wp_insert_post( $postarr, true );
+});
+
+			
 			self::cpt_checkpoint( 'Returned from wp_update_post()', $log );
 
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
@@ -1447,6 +1463,10 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 		} else {
 			self::cpt_checkpoint( 'Calling wp_insert_post()', $log );
 			$post_id = wp_insert_post( $postarr, true );
+			$post_id = self::with_disabled_post_hooks( function() use ( $postarr ) {
+	return wp_insert_post( $postarr, true );
+});
+
 			self::cpt_checkpoint( 'Returned from wp_insert_post()', $log );
 
 			if ( is_wp_error( $post_id ) ) throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
@@ -1614,3 +1634,5 @@ private static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string 
 }
 
 IKA_WatuPRO_Importer::init();
+add_action( 'admin_post_ika_watupro_ping', [ 'IKA_WatuPRO_Importer', 'handle_ping' ] );
+
