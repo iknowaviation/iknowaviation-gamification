@@ -967,4 +967,38 @@ class IKA_WatuPRO_Importer_Engine {
 			$tm = self::t_master();
 			return $wpdb->get_results( "SELECT ID, name FROM {$tm} ORDER BY ID DESC LIMIT 300", ARRAY_A ) ?: [];
 		}
+
+		/**
+		 * Fetch quiz-level defaults from an existing WatuPRO quiz.
+		 *
+		 * This is intentionally lightweight: it pulls the master row and maps
+		 * whitelisted settings keys into a stable array used by both the Import
+		 * Review UI and the Template system.
+		 */
+		public static function get_master_defaults_for_builder( int $quiz_id ) : array {
+			global $wpdb;
+			$quiz_id = (int) $quiz_id;
+			if ( $quiz_id <= 0 ) {
+				return [ 'settings' => [], 'description_html' => '', 'final_screen_html' => '' ];
+			}
+
+			$tm = self::t_master();
+			$master = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$tm} WHERE ID = %d", $quiz_id ), ARRAY_A );
+			if ( ! is_array( $master ) ) {
+				return [ 'settings' => [], 'description_html' => '', 'final_screen_html' => '' ];
+			}
+
+			$settings = [];
+			foreach ( self::master_settings_whitelist() as $k => $_label ) {
+				if ( array_key_exists( $k, $master ) ) {
+					$settings[ $k ] = self::is_boolish_master_key( $k ) ? (int) $master[ $k ] : (string) $master[ $k ];
+				}
+			}
+
+			return [
+				'settings'         => $settings,
+				'description_html' => (string) ( $master['description'] ?? '' ),
+				'final_screen_html'=> (string) ( $master['final_screen'] ?? '' ),
+			];
+		}
 }
