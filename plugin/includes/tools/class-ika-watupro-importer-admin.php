@@ -6,10 +6,44 @@ class IKA_WatuPRO_Importer_Admin {
 	add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 			add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
 			add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
+			add_action( 'admin_post_ika_watupro_template_capture', [ __CLASS__, 'handle_template_capture' ] );
 	
 			// NEW: Builder JSON generator
 			add_action( 'admin_post_ika_watupro_build_json', [ __CLASS__, 'handle_builder_generate_json' ] );
 		}
+
+	/**
+	 * Capture/refresh the default template from a given quiz ID.
+	 */
+	public static function handle_template_capture() {
+		if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Insufficient permissions.' );
+		check_admin_referer( 'ika_watupro_template_capture', 'ika_tpl_nonce' );
+
+		$quiz_id = isset( $_POST['template_source_quiz_id'] ) ? absint( $_POST['template_source_quiz_id'] ) : 0;
+		if ( $quiz_id <= 0 ) {
+			set_transient( 'ika_watupro_import_last_result', [
+				'ok' => false,
+				'message' => 'Template capture failed: invalid quiz ID.',
+				'log' => [],
+			], 60 );
+			wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
+			exit;
+		}
+
+		// Remember last used quiz ID for template capture UI.
+		update_option( 'ika_watupro_tpl_last_source_quiz_id', $quiz_id, false );
+		$ok = IKA_WatuPRO_Importer_Templates::templates_refresh_default_from_quiz( $quiz_id );
+		set_transient( 'ika_watupro_import_last_result', [
+			'ok' => (bool) $ok,
+			'message' => $ok
+				? sprintf( 'Default template refreshed from quiz ID %d.', $quiz_id )
+				: sprintf( 'Template capture failed for quiz ID %d. Make sure it exists.', $quiz_id ),
+			'log' => [],
+		], 60 );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
+		exit;
+	}
 
 	public static function add_menu() {
 			add_submenu_page(
@@ -64,6 +98,26 @@ class IKA_WatuPRO_Importer_Admin {
 					</div>
 				<?php endif; ?>
 	<hr />
+
+				<h2>Template Capture</h2>
+				<p>Refresh the <strong>Default</strong> template by copying quiz-level settings from an existing WatuPRO quiz (e.g., quiz <strong>#6</strong>).</p>
+
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="ika_watupro_template_capture" />
+					<?php wp_nonce_field( 'ika_watupro_template_capture', 'ika_tpl_nonce' ); ?>
+					<table class="form-table" role="presentation">
+						<tr>
+							<th scope="row"><label for="template_source_quiz_id">Source quiz ID</label></th>
+							<td>
+								<input type="number" min="1" step="1" name="template_source_quiz_id" id="template_source_quiz_id" value="<?php echo esc_attr( (int) get_option( 'ika_watupro_tpl_last_source_quiz_id', 6 ) ); ?>" style="width:120px;" />
+								<p class="description">Defaults to 6, but you can enter any existing WatuPRO quiz ID.</p>
+							</td>
+						</tr>
+					</table>
+					<?php submit_button( 'Capture / Refresh Default Template', 'secondary', 'submit', false ); ?>
+				</form>
+
+				<hr />
 	
 				<h2>Import JSON</h2>
 				<p><strong>Tip:</strong> Run Dry Run first. Then Import.</p>

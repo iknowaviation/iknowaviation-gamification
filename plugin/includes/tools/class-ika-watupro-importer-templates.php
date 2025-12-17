@@ -34,6 +34,19 @@ class IKA_WatuPRO_Importer_Templates {
 			return 'default';
 		}
 
+	/**
+	 * Refresh (overwrite) the built-in "default" template from a given WatuPRO quiz ID.
+	 * Returns true on success.
+	 */
+	public static function templates_refresh_default_from_quiz( int $quiz_id = 6 ) : bool {
+		if ( $quiz_id <= 0 ) return false;
+		$tpls = self::templates_get_all();
+		$tpls['default'] = self::template_capture_from_quiz( 'default', 'Default (captured)', $quiz_id );
+		self::templates_save_all( $tpls );
+		self::templates_set_default_id( 'default' );
+		return true;
+	}
+
 	public static function template_capture_from_quiz( string $id, string $name, int $quiz_id ) : array {
 			$defaults = IKA_WatuPRO_Importer_Engine::get_master_defaults_for_builder( $quiz_id );
 			$settings = is_array( $defaults['settings'] ?? null ) ? $defaults['settings'] : [];
