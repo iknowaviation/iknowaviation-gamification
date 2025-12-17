@@ -245,7 +245,48 @@ class IKA_WatuPRO_Importer_Admin {
 							</td>
 						</tr>
 	
-					</table>
+					
+						<tr>
+							<th scope="row">Template (settings preset)</th>
+							<td>
+								<?php $tpls = IKA_WatuPRO_Importer_Templates::templates_get_all(); $def_tpl = IKA_WatuPRO_Importer_Templates::templates_get_default_id(); ?>
+								<select name="template_id">
+									<option value="">(Default)</option>
+									<?php foreach ( $tpls as $tid => $tpl ) : if ( ! is_array($tpl) ) continue; $name = isset($tpl['name']) ? (string)$tpl['name'] : (string)$tid; ?>
+										<option value="<?php echo esc_attr( $tid ); ?>" <?php selected( $tid, $def_tpl ); ?>><?php echo esc_html( $name . ' [' . $tid . ']' ); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<p class="description">Applies template settings + description/final screen defaults unless overridden below.</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Template variant</th>
+							<td>
+								<select name="template_variant">
+									<?php foreach ( ['A','B','C','D'] as $v ) : ?>
+										<option value="<?php echo esc_attr($v); ?>" <?php selected( $v, 'A' ); ?>><?php echo esc_html($v); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<label style="margin-left:12px;">
+									<input type="checkbox" name="force_template" value="1" />
+									Force template values (overwrite JSON)
+								</label>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Override description (optional)</th>
+							<td>
+								<textarea name="override_description_html" rows="4" style="width:100%;max-width:720px;" placeholder="If set, this overrides the WatuPRO quiz description / hero content..."></textarea>
+								<p class="description">Writes to <code>watupro_master.description</code> (this controls your quiz header/hero content).</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">Override final screen (optional)</th>
+							<td>
+								<textarea name="override_final_screen_html" rows="3" style="width:100%;max-width:720px;" placeholder="Optional final screen HTML..."></textarea>
+							</td>
+						</tr>
+</table>
 	
 					<?php submit_button( 'Run Import' ); ?>
 				</form>
@@ -1016,6 +1057,16 @@ class IKA_WatuPRO_Importer_Admin {
 	
 		wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer' ) );
 		exit;
+			// Templates Manager submenu
+			add_submenu_page(
+				'ika-gamification',
+				'Quiz Templates',
+				'Quiz Templates',
+				'manage_options',
+				'ika-watupro-importer-templates',
+				[ __CLASS__, 'render_templates_page' ]
+			);
+
 	}
 
 	public static function handle_export() {

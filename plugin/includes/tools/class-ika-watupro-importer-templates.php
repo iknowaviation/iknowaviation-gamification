@@ -11,6 +11,45 @@ class IKA_WatuPRO_Importer_Templates {
 			update_option( IKA_WatuPRO_Importer_Engine::OPT_TEMPLATES, $tpls, false );
 		}
 
+
+		public static function templates_get( string $id ) : ?array {
+			$tpls = self::templates_get_all();
+			if ( $id === '' || ! isset( $tpls[ $id ] ) || ! is_array( $tpls[ $id ] ) ) return null;
+			return $tpls[ $id ];
+		}
+
+		public static function templates_upsert( string $id, array $template ) : void {
+			$tpls = self::templates_get_all();
+			$template['id'] = $id;
+			$template['updated_at'] = time();
+			$tpls[ $id ] = $template;
+			self::templates_save_all( $tpls );
+		}
+
+		public static function templates_delete( string $id ) : bool {
+			$tpls = self::templates_get_all();
+			if ( $id === '' || ! isset( $tpls[ $id ] ) ) return false;
+			unset( $tpls[ $id ] );
+			self::templates_save_all( $tpls );
+			$default = self::templates_get_default_id();
+			if ( $default === $id ) self::templates_set_default_id( '' );
+			return true;
+		}
+
+		public static function templates_duplicate( string $source_id, string $new_id, string $new_name = '' ) : bool {
+			$tpls = self::templates_get_all();
+			if ( ! isset( $tpls[ $source_id ] ) || ! is_array( $tpls[ $source_id ] ) ) return false;
+			if ( $new_id === '' ) return false;
+			$copy = $tpls[ $source_id ];
+			$copy['id'] = $new_id;
+			$copy['name'] = $new_name !== '' ? $new_name : ( (string)($copy['name'] ?? $source_id) . ' (Copy)' );
+			$copy['updated_at'] = time();
+			$tpls[ $new_id ] = $copy;
+			self::templates_save_all( $tpls );
+			return true;
+		}
+
+
 	public static function templates_get_default_id() : string {
 			$default = (string) get_option( IKA_WatuPRO_Importer_Engine::OPT_DEFAULT_TEMPLATE, '' );
 			if ( $default !== '' ) return $default;
