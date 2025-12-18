@@ -11,9 +11,13 @@ class IKA_WatuPRO_Importer_Engine {
 	const CPT_META_IMPORT_HASH   = '_ika_watupro_import_hash';
 
 	// Optional taxonomies for recommendation engine tagging (CPT-level)
-	const TAX_TOPIC              = 'ika_topic';
-	const TAX_DIFFICULTY         = 'ika_difficulty';
-	const TAX_AUDIENCE           = 'ika_audience';
+	// WordPress taxonomies applied to the Quiz CPT (used by the importer + recommendation signals).
+	// These are intentionally quiz-scoped so they don't collide with other content types.
+	const TAX_TOPIC      = 'ika_quiz_topic';
+	const TAX_DIFFICULTY = 'ika_quiz_difficulty';
+	const TAX_AUDIENCE   = 'ika_quiz_audience';
+	const TAX_TRACK      = 'ika_quiz_track';
+	const TAX_GROUP      = 'ika_quiz_group';
 
 	// Templates (stored as option array)
 	const OPT_TEMPLATES          = 'ika_watupro_import_templates_v1';
@@ -463,6 +467,33 @@ class IKA_WatuPRO_Importer_Engine {
 
 	public static function apply_quiz_tags( int $post_id, array $tags, array &$log ) : void {
 			if ( ! $post_id ) return;
+
+			// Back-compat: allow legacy keys/synonyms (useful during early schema iteration).
+			if ( isset( $tags['topic'] ) && ! isset( $tags['topics'] ) ) {
+				$tags['topics'] = $tags['topic'];
+			}
+			if ( isset( $tags['difficulties'] ) && ! isset( $tags['difficulty'] ) ) {
+				$tags['difficulty'] = $tags['difficulties'];
+			}
+
+			// Track + group are optional. These help align quizzes to courses/modules.
+			if ( isset( $tags['track'] ) && $tags['track'] !== '' ) {
+				if ( taxonomy_exists( self::TAX_TRACK ) ) {
+					wp_set_object_terms( $post_id, [ (string) $tags['track'] ], self::TAX_TRACK, false );
+					$log[] = "Applied track to taxonomy " . self::TAX_TRACK . ".";
+				} else {
+					$log[] = "Taxonomy missing: " . self::TAX_TRACK . " (track not applied).";
+				}
+			}
+
+			if ( isset( $tags['group'] ) && $tags['group'] !== '' ) {
+				if ( taxonomy_exists( self::TAX_GROUP ) ) {
+					wp_set_object_terms( $post_id, [ (string) $tags['group'] ], self::TAX_GROUP, false );
+					$log[] = "Applied group to taxonomy " . self::TAX_GROUP . ".";
+				} else {
+					$log[] = "Taxonomy missing: " . self::TAX_GROUP . " (group not applied).";
+				}
+			}
 	
 			if ( isset($tags['topics']) && is_array($tags['topics']) ) {
 				if ( taxonomy_exists( self::TAX_TOPIC ) ) {

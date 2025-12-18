@@ -6,9 +6,7 @@ class IKA_WatuPRO_Importer_Admin {
 	add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
 			add_action( 'admin_post_ika_watupro_import', [ __CLASS__, 'handle_import' ] );
 			add_action( 'admin_post_ika_watupro_export', [ __CLASS__, 'handle_export' ] );
-			add_action( 'admin_post_ika_watupro_template_save', [ __CLASS__, 'handle_template_save' ] );
 			add_action( 'admin_post_ika_watupro_template_capture', [ __CLASS__, 'handle_template_capture' ] );
-		add_action( 'admin_post_ika_watupro_template_delete', [ __CLASS__, 'handle_template_delete' ] );
 	
 			// NEW: Builder JSON generator
 			add_action( 'admin_post_ika_watupro_build_json', [ __CLASS__, 'handle_builder_generate_json' ] );
@@ -248,46 +246,7 @@ class IKA_WatuPRO_Importer_Admin {
 						</tr>
 	
 					
-						<tr>
-							<th scope="row">Template (settings preset)</th>
-							<td>
-								<?php $tpls = IKA_WatuPRO_Importer_Templates::templates_get_all(); $def_tpl = IKA_WatuPRO_Importer_Templates::templates_get_default_id(); ?>
-								<select name="template_id">
-									<option value="">(Default)</option>
-									<?php foreach ( $tpls as $tid => $tpl ) : if ( ! is_array($tpl) ) continue; $name = isset($tpl['name']) ? (string)$tpl['name'] : (string)$tid; ?>
-										<option value="<?php echo esc_attr( $tid ); ?>" <?php selected( $tid, $def_tpl ); ?>><?php echo esc_html( $name . ' [' . $tid . ']' ); ?></option>
-									<?php endforeach; ?>
-								</select>
-								<p class="description">Applies template settings + description/final screen defaults unless overridden below.</p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">Template variant</th>
-							<td>
-								<select name="template_variant">
-									<?php foreach ( ['A','B','C','D'] as $v ) : ?>
-										<option value="<?php echo esc_attr($v); ?>" <?php selected( $v, 'A' ); ?>><?php echo esc_html($v); ?></option>
-									<?php endforeach; ?>
-								</select>
-								<label style="margin-left:12px;">
-									<input type="checkbox" name="force_template" value="1" />
-									Force template values (overwrite JSON)
-								</label>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">Override description (optional)</th>
-							<td>
-								<textarea name="override_description_html" rows="4" style="width:100%;max-width:720px;" placeholder="If set, this overrides the WatuPRO quiz description / hero content..."></textarea>
-								<p class="description">Writes to <code>watupro_master.description</code> (this controls your quiz header/hero content).</p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">Override final screen (optional)</th>
-							<td>
-								<textarea name="override_final_screen_html" rows="3" style="width:100%;max-width:720px;" placeholder="Optional final screen HTML..."></textarea>
-							</td>
-						</tr>
+						
 </table>
 	
 					<?php submit_button( 'Run Import' ); ?>
@@ -367,7 +326,6 @@ class IKA_WatuPRO_Importer_Admin {
 					</table>
 	
 					<?php submit_button( 'Download JSON Export', 'secondary' ); ?>
-				</form>
 				
 	<hr />
 	<h2 id="ika-templates">Quiz Templates</h2>
@@ -421,7 +379,7 @@ class IKA_WatuPRO_Importer_Admin {
 				<td>
 					<a class="button button-small" href="<?php echo esc_url( admin_url('admin.php?page=ika-watupro-importer&edit_template=' . rawurlencode($tid) . '#ika-templates') ); ?>">Edit</a>
 					<?php if ( $tid !== 'default' ) : ?>
-						<a class="button button-small" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=ika_watupro_template_delete&template_id=' . rawurlencode($tid) ), 'ika_watupro_template_delete', 'ika_nonce' ) ); ?>" onclick="return confirm('Delete this template?');">Delete</a>
+						<a class="button button-small" href="<?php echo esc_url( wp_nonce_url( admin_url('admin-post.php?action=ika_watupro_template_delete&template_id=' . rawurlencode($tid)), 'ika_watupro_template_delete', 'ika_nonce' ) ); ?>" onclick="return confirm('Delete this template?');">Delete</a>
 					<?php endif; ?>
 				</td>
 			</tr>
@@ -449,12 +407,12 @@ class IKA_WatuPRO_Importer_Admin {
 			<tr>
 				<th scope="row"><label for="source_quiz_id">Capture from Quiz ID</label></th>
 				<td>
-					<input type="number" id="source_quiz_id" name="source_quiz_id" value="<?php echo esc_attr( (int)($edit_tpl['source_quiz_id'] ?? 6) ); ?><input type="hidden" name="ika_template_action" value="save" />
-<div style="margin-top:8px;">
-    <button type="submit" class="button" name="ika_template_action" value="capture">Capture from this Quiz</button>
-    <span class="description" style="margin-left:10px;">(Requires a valid quiz ID above)</span>
-</div>
-<p class="description">Capturing copies WatuPRO master settings and saves the current description/final screen as Variant A.</p>
+					<input type="number" id="source_quiz_id" name="source_quiz_id" value="<?php echo esc_attr( (int)($edit_tpl['source_quiz_id'] ?? 6) ); ?>" min="1" />
+					<label style="margin-left:12px;">
+						<input type="checkbox" name="capture_from_quiz" value="1" />
+						Overwrite this template by capturing from that quiz now
+					</label>
+					<p class="description">Capturing copies WatuPRO master settings and saves the current description/final screen as Variant A.</p>
 				</td>
 			</tr>
 			<tr>
@@ -493,6 +451,8 @@ class IKA_WatuPRO_Importer_Admin {
 				<a class="button" href="<?php echo esc_url( admin_url('admin.php?page=ika-watupro-importer#ika-templates') ); ?>">Cancel</a>
 			<?php endif; ?>
 		</p>
+	</form>
+	
 	</form>
 			</div>
 			<?php
@@ -816,24 +776,15 @@ class IKA_WatuPRO_Importer_Admin {
 			$name = isset($_POST['template_name']) ? sanitize_text_field( (string) wp_unslash($_POST['template_name']) ) : '';
 			if ( $name === '' ) $name = $id;
 	
-			$source_quiz_id = isset($_POST['source_quiz_id']) ? (int) wp_unslash($_POST['source_quiz_id']) : 0;
-
-// Explicit action routing (prevents "capture" validation from blocking normal saves)
-$tpl_action = isset($_POST['ika_template_action'])
-    ? sanitize_key( (string) wp_unslash($_POST['ika_template_action']) )
-    : 'save';
-
-$tpls = IKA_WatuPRO_Importer_Templates::templates_get_all();
-
-if ( $tpl_action === 'capture' ) {
-    if ( $source_quiz_id <= 0 ) {
-        IKA_WatuPRO_Importer_Engine::set_notice( false, 'Template capture requires a valid source quiz ID.' );
-        wp_safe_redirect( admin_url( 'admin.php?page=ika-watupro-importer&tab=templates&edit_template=' . rawurlencode($id) . '#ika-templates' ) );
-        exit;
-    }
-
-    $tpl = IKA_WatuPRO_Importer_Templates::template_capture_from_quiz( $id, $name, $source_quiz_id );
-} else {// Manual save: keep existing settings unless provided as JSON in advanced box.
+			$source_quiz_id = isset($_POST['source_quiz_id']) ? (int) $_POST['source_quiz_id'] : 0;
+			$action_capture = isset($_POST['capture_from_quiz']) ? (string) wp_unslash($_POST['capture_from_quiz']) : '';
+	
+			$tpls = IKA_WatuPRO_Importer_Templates::templates_get_all();
+	
+			if ( $action_capture === '1' && $source_quiz_id > 0 ) {
+				$tpl = IKA_WatuPRO_Importer_Templates::template_capture_from_quiz( $id, $name, $source_quiz_id );
+			} else {
+				// Manual save: keep existing settings unless provided as JSON in advanced box.
 				$tpl = $tpls[$id] ?? [
 					'id' => $id,
 					'name' => $name,

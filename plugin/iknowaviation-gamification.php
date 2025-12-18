@@ -28,6 +28,7 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/feature-flags.php';
  */
 require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
+require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-taxonomies.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro/quiz-wrapper.php';
 
 /**
@@ -150,3 +151,4 @@ add_action( 'admin_notices', function() {
 	echo '. Some gamification features may not work until they are activated.';
 	echo '</p></div>';
 } );
+
