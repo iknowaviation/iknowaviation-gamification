@@ -506,14 +506,14 @@ class IKA_WatuPRO_Importer_Engine {
 				if ( empty( $q['answer_type'] ) ) throw new Exception( "Question #".($idx+1)." missing answer_type." );
 				if ( empty( $q['answers'] ) || ! is_array( $q['answers'] ) ) throw new Exception( "Question #".($idx+1)." missing answers array." );
 	
-				// ✅ Required: exactly one explanation per question (stored in watupro_question.explain_answer)
+				// Required: exactly one explanation per question (stored in watupro_question.explain_answer)
 				if ( empty( $q['explain_answer_html'] ) ) {
 					throw new Exception( "Question #".($idx+1)." missing explain_answer_html (required)." );
 				}
 	
 				foreach ( $q['answers'] as $aidx => $a ) {
 					if ( empty( $a['answer_html'] ) ) throw new Exception( "Question #".($idx+1)." answer #".($aidx+1)." missing answer_html." );
-					// 🚫 Disallow answer-level explanations (we use question-level only)
+					// Disallow answer-level explanations (we use question-level only)
 					if ( isset($a['explanation_html']) && trim((string)$a['explanation_html']) !== '' ) {
 						throw new Exception( "Question #".($idx+1)." answer #".($aidx+1)." includes explanation_html. Use explain_answer_html at the question level only." );
 					}
@@ -1001,4 +1001,23 @@ class IKA_WatuPRO_Importer_Engine {
 				'final_screen_html'=> (string) ( $master['final_screen'] ?? '' ),
 			];
 		}
+		
+		/**
+		 * Admin notice helper (transient + option fallback).
+		 * Kept as a stable API because admin/controllers call it.
+		 */
+		public static function set_notice( bool $success, string $message ): void {
+			$payload = [
+				'ts'      => time(),
+				'success' => $success ? 1 : 0,
+				'message' => $message,
+			];
+
+			// Primary: transient (short-lived, auto-expires)
+			set_transient( 'ika_watupro_importer_notice', $payload, 60 );
+
+			// Fallback: option (in case transient fails / object cache oddities)
+			update_option( 'ika_watupro_importer_notice_fallback', $payload, false );
+		}
+
 }
