@@ -633,7 +633,17 @@ class IKA_WatuPRO_Importer_Engine {
 		}
 
 	public static function validate_payload( array $data ) {
-			if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
+		// Importer Schema Lock (v1.1)
+		// Fail fast on unknown/older schemas to avoid silent mis-imports.
+		if ( ! array_key_exists( 'schema_version', $data ) ) {
+			throw new Exception( 'Missing schema_version. Expected schema_version="1.1".' );
+		}
+		$sv = is_scalar( $data['schema_version'] ) ? trim( (string) $data['schema_version'] ) : '';
+		if ( $sv !== '1.1' ) {
+			throw new Exception( 'Unsupported schema_version="' . $sv . '". This importer is locked to schema_version="1.1".' );
+		}
+
+		if ( empty( $data['quiz'] ) || ! is_array( $data['quiz'] ) ) throw new Exception( 'Missing "quiz" object.' );
 			if ( empty( $data['quiz']['name'] ) ) throw new Exception( 'Missing quiz.name.' );
 	
 			if ( ! array_key_exists( 'questions', $data ) || ! is_array( $data['questions'] ) ) {
