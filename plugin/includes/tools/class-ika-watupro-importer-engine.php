@@ -418,14 +418,18 @@ class IKA_WatuPRO_Importer_Engine {
 					if ( $cpt_enable ) {
 						if ( $is_dry ) {
 							$log[] = '[Dry Run] Would create/update CPT post and link exam ID.';
-						} else {
+															// wp.parent_slug + wp.tax preview
+									self::apply_wp_hierarchy_and_tax( 0, $data, $log, 'dry' );
+} else {
 						  try {
 							$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
 	
 							if ( $post_id ) {
 							  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
 							  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
-							} else {
+														  // Apply wp.parent_slug + wp.tax (hierarchy + recommendation tagging)
+												  self::apply_wp_hierarchy_and_tax( (int) $post_id, $data, $log, 'live' );
+} else {
 							  $log[] = "CPT sync returned no post_id (unexpected).";
 							}
 						  } catch ( Throwable $t ) {
@@ -464,6 +468,111 @@ class IKA_WatuPRO_Importer_Engine {
 				throw $t;
 			}	
 		}
+
+		/**
+	 * Apply WordPress hierarchy + taxonomies from JSON payload.
+	 *
+	 * Supports:
+	 *  - wp.parent_slug (sets CPT post_parent)
+	 *  - wp.tax (assigns terms; creates missing terms when not in dry-run)
+	 */
+	private static function apply_wp_hierarchy_and_tax( int $post_id, array $payload, array &$log, string $mode = 'live' ) : void {
+		$wp = $payload['wp'] ?? null;
+		if ( ! is_array( $wp ) ) return;
+
+		$is_dry = ( $mode === 'dry' );
+
+		// -----------------------------
+		// Parent hierarchy: wp.parent_slug
+		// -----------------------------
+		$parent_slug = isset( $wp['parent_slug'] ) ? sanitize_title( (string) $wp['parent_slug'] ) : '';
+		if ( $parent_slug !== '' ) {
+			if ( $is_dry ) {
+				$log[] = "[Dry Run] Would set CPT parent via wp.parent_slug='{$parent_slug}'.";
+			} else {
+				$parent = get_page_by_path( $parent_slug, OBJECT, self::CPT_POST_TYPE );
+				if ( $parent && $post_id ) {
+					global $wpdb;
+					$ok = $wpdb->update(
+						$wpdb->posts,
+						[ 'post_parent' => (int) $parent->ID ],
+						[ 'ID' => (int) $post_id ],
+						[ '%d' ],
+						[ '%d' ]
+					);
+					if ( $ok === false ) {
+						$log[] = "WARNING: Failed setting post_parent (post_id={$post_id}) via DB: " . $wpdb->last_error;
+					} else {
+						$log[] = "Set CPT parent to '{$parent_slug}' (ID {$parent->ID}).";
+					}
+				} else {
+					if ( ! $parent ) $log[] = "WARNING: wp.parent_slug '{$parent_slug}' not found (no parent set).";
+					elseif ( ! $post_id ) $log[] = "WARNING: wp.parent_slug present but no CPT post_id available.";
+				}
+			}
+		}
+
+		// -----------------------------
+		// Taxonomies: wp.tax
+		// -----------------------------
+		$tax = $wp['tax'] ?? null;
+		if ( ! is_array( $tax ) ) return;
+
+		foreach ( $tax as $taxonomy => $terms ) {
+			$taxonomy = sanitize_key( (string) $taxonomy );
+			if ( $taxonomy === '' ) continue;
+
+			if ( ! taxonomy_exists( $taxonomy ) ) {
+				$log[] = "WARNING: wp.tax refers to missing taxonomy '{$taxonomy}' (skipped).";
+				continue;
+			}
+
+			$terms = is_array( $terms ) ? $terms : [ $terms ];
+			$terms_clean = [];
+			foreach ( $terms as $t ) {
+				$t = trim( (string) $t );
+				if ( $t !== '' ) $terms_clean[] = $t;
+			}
+			if ( empty( $terms_clean ) ) continue;
+
+			if ( $is_dry ) {
+				$log[] = "[Dry Run] Would assign taxonomy '{$taxonomy}' → " . implode( ', ', $terms_clean ) . ".";
+				continue;
+			}
+
+			if ( ! $post_id ) {
+				$log[] = "WARNING: wp.tax present but no CPT post_id available (taxonomy '{$taxonomy}' skipped).";
+				continue;
+			}
+
+			// Ensure terms exist (so wp_set_object_terms doesn't silently fail on some setups)
+			$term_ids = [];
+			foreach ( $terms_clean as $term_name ) {
+				$exists = term_exists( $term_name, $taxonomy );
+
+				if ( ! $exists ) {
+					$created = wp_insert_term( $term_name, $taxonomy );
+					if ( is_wp_error( $created ) ) {
+						$log[] = "ERROR creating term '{$term_name}' in '{$taxonomy}': " . $created->get_error_message();
+						continue;
+					}
+					$term_ids[] = (int) $created['term_id'];
+				} else {
+					$term_ids[] = (int) ( is_array( $exists ) ? $exists['term_id'] : $exists );
+				}
+			}
+
+			if ( $term_ids ) {
+				$res = wp_set_object_terms( $post_id, $term_ids, $taxonomy, false );
+				if ( is_wp_error( $res ) ) {
+					$log[] = "ERROR assigning taxonomy '{$taxonomy}': " . $res->get_error_message();
+				} else {
+					$log[] = "Assigned taxonomy '{$taxonomy}' → " . implode( ', ', $terms_clean ) . ".";
+				}
+			}
+		}
+	}
+
 
 	public static function apply_quiz_tags( int $post_id, array $tags, array &$log ) : void {
 			if ( ! $post_id ) return;
