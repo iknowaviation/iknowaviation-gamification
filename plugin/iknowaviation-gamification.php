@@ -25,46 +25,13 @@ define( 'IKA_GAM_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 require_once IKA_GAM_PLUGIN_PATH . 'includes/feature-flags.php';
 
 
-/**
- * Quiz CPT permalink support:
- * Ensure hierarchical quiz URLs like /quiz/intro-to-aviation/quiz-1/ work.
- * This forces rewrite rules to accept parent/child segments.
- *
- * NOTE: Flush permalinks after deploying this change.
- */
-add_filter( 'register_post_type_args', function( $args, $post_type ) {
+// NOTE: We intentionally avoid any custom rewrite/router logic for quiz URLs.
+// Quizzes use stable flat permalinks like: /quiz/{quiz-slug}/
+// Track alignment and course grouping is handled via taxonomies + post meta,
+// not via URL hierarchy.
 
-	if ( $post_type !== 'quiz' ) {
-		return $args;
-	}
 
-	/**
-	 * Page Hub → Quiz CPT child model:
-	 * Quizzes remain a normal (non-page-like) CPT.
-	 * URLs like /quiz/{hub}/{quiz}/ are handled by our rewrite rule + meta guard
-	 * in includes/quiz-rewrites.php (no CPT hierarchy required).
-	 */
-	$args['hierarchical'] = false;
 
-	// Ensure rewrite slug is /quiz/
-	if ( empty( $args['rewrite'] ) || ! is_array( $args['rewrite'] ) ) {
-		$args['rewrite'] = [];
-	}
-	if ( empty( $args['rewrite']['slug'] ) ) {
-		$args['rewrite']['slug'] = 'quiz';
-	}
-
-	// Explicitly disable hierarchical rewrites for this CPT.
-	$args['rewrite']['hierarchical'] = false;
-
-	// Page Attributes (parent UI) not needed for this model; remove if present.
-	if ( isset( $args['supports'] ) && is_array( $args['supports'] ) ) {
-		$args['supports'] = array_values( array_diff( $args['supports'], [ 'page-attributes' ] ) );
-	}
-
-	return $args;
-
-}, 20, 2 );
 
 /**
  * Core modules (keep always-on unless you have a reason to gate them)
@@ -72,8 +39,7 @@ add_filter( 'register_post_type_args', function( $args, $post_type ) {
 require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-taxonomies.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro/quiz-wrapper.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-rewrites.php';
+require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-wrapper.php';
 
 /**
  * Optional improvement:

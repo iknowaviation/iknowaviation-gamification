@@ -483,39 +483,37 @@ class IKA_WatuPRO_Importer_Engine {
 		$is_dry = ( $mode === 'dry' );
 
 		// -----------------------------
-		// Page Hub: wp.parent_page_slug (required for hub URLs)
+		// Parent hierarchy: wp.parent_slug
 		// -----------------------------
-		$hub_slug = isset( $wp['parent_page_slug'] ) ? sanitize_title( (string) $wp['parent_page_slug'] ) : '';
-
-		if ( $hub_slug ) {
-			// Prefer hubs that live under /quiz/ (Page path: quiz/{hub})
-			$hub_page = get_page_by_path( 'quiz/' . $hub_slug, OBJECT, 'page' );
-			if ( ! $hub_page ) {
-				// Fallback: any page with that slug/path
-				$hub_page = get_page_by_path( $hub_slug, OBJECT, 'page' );
-			}
-
-			if ( $mode === 'dry' ) {
-				$log[] = "[Dry Run] Would link quiz CPT to hub page via wp.parent_page_slug='{$hub_slug}'.";
+		$parent_slug = isset( $wp['parent_slug'] ) ? sanitize_title( (string) $wp['parent_slug'] ) : '';
+		if ( $parent_slug !== '' ) {
+			if ( $is_dry ) {
+				$log[] = "[Dry Run] Would set CPT parent via wp.parent_slug='{$parent_slug}'.";
 			} else {
-				if ( ! $hub_page || empty( $hub_page->ID ) ) {
-					throw new Exception( "wp.parent_page_slug '{$hub_slug}' not found as a Page (expected /quiz/{$hub_slug}/)." );
+				$parent = get_page_by_path( $parent_slug, OBJECT, self::CPT_POST_TYPE );
+				if ( $parent && $post_id ) {
+					global $wpdb;
+					$ok = $wpdb->update(
+						$wpdb->posts,
+						[ 'post_parent' => (int) $parent->ID ],
+						[ 'ID' => (int) $post_id ],
+						[ '%d' ],
+						[ '%d' ]
+					);
+					if ( $ok === false ) {
+						$log[] = "WARNING: Failed setting post_parent (post_id={$post_id}) via DB: " . $wpdb->last_error;
+					} else {
+						$log[] = "Set CPT parent to '{$parent_slug}' (ID {$parent->ID}).";
+					}
+				} else {
+					if ( ! $parent ) $log[] = "WARNING: wp.parent_slug '{$parent_slug}' not found (no parent set).";
+					elseif ( ! $post_id ) $log[] = "WARNING: wp.parent_slug present but no CPT post_id available.";
 				}
-				// Store hub metadata for permalinks + validation.
-				self::upsert_postmeta_db( $post_id, '_ika_quiz_hub_slug', $hub_slug );
-				self::upsert_postmeta_db( $post_id, '_ika_quiz_hub_page_id', (string) (int) $hub_page->ID );
-				$log[] = "Linked quiz CPT to hub page '{$hub_slug}' (Page ID {$hub_page->ID}).";
-			}
-		} else {
-			// Back-compat: older key wp.parent_slug (deprecated in Page Hub model)
-			if ( isset( $wp['parent_slug'] ) && $wp['parent_slug'] ) {
-				$log[] = "NOTICE: wp.parent_slug is deprecated. Use wp.parent_page_slug (Page Hub model).";
 			}
 		}
 
 		// -----------------------------
 		// Taxonomies: wp.tax
-
 		// -----------------------------
 		$tax = $wp['tax'] ?? null;
 		if ( ! is_array( $tax ) ) return;
