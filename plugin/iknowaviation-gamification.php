@@ -38,150 +38,33 @@ add_filter( 'register_post_type_args', function( $args, $post_type ) {
 		return $args;
 	}
 
-	// Ensure hierarchical behavior on the post type itself.
-	$args['hierarchical'] = true;
+	/**
+	 * Page Hub → Quiz CPT child model:
+	 * Quizzes remain a normal (non-page-like) CPT.
+	 * URLs like /quiz/{hub}/{quiz}/ are handled by our rewrite rule + meta guard
+	 * in includes/quiz-rewrites.php (no CPT hierarchy required).
+	 */
+	$args['hierarchical'] = false;
 
-	// Ensure Page Attributes support so "Parent" UI works.
-	$args['supports'] = isset( $args['supports'] ) && is_array( $args['supports'] ) ? $args['supports'] : [];
-	if ( ! in_array( 'page-attributes', $args['supports'], true ) ) {
-		$args['supports'][] = 'page-attributes';
-	}
-
-	// CRITICAL: allow hierarchical URLs like /quiz/parent/child/
+	// Ensure rewrite slug is /quiz/
 	if ( empty( $args['rewrite'] ) || ! is_array( $args['rewrite'] ) ) {
 		$args['rewrite'] = [];
 	}
-
 	if ( empty( $args['rewrite']['slug'] ) ) {
 		$args['rewrite']['slug'] = 'quiz';
 	}
 
-	$args['rewrite']['hierarchical'] = true;
+	// Explicitly disable hierarchical rewrites for this CPT.
+	$args['rewrite']['hierarchical'] = false;
+
+	// Page Attributes (parent UI) not needed for this model; remove if present.
+	if ( isset( $args['supports'] ) && is_array( $args['supports'] ) ) {
+		$args['supports'] = array_values( array_diff( $args['supports'], [ 'page-attributes' ] ) );
+	}
 
 	return $args;
 
 }, 20, 2 );
-
-/**
- * Resolve hierarchical Quiz CPT URLs like:
- * /quiz/intro-to-aviation/importer-wp-parenttax-test-fixed-v2/
- *
- * WordPress can be inconsistent resolving hierarchical CPT URLs on some installs,
- * especially when the CPT is registered via CPT UI. This request filter resolves
- * the full path against the 'quiz' post type and forces WP to load the correct post.
- */
-/**
- * Quiz CPT – True hierarchy URLs
- *
- * WordPress is inconsistent with hierarchical URLs for hierarchical CPTs.
- * This resolver makes URLs like:
- *   /quiz/{parent}/{child}/
- * work reliably by resolving the child post by slug and validating the requested
- * parent slug against the child’s ancestor chain.
- *
- * It only targets multi-segment /quiz/.../... requests.
- */
-
-/* Debug header (safe to leave; remove later if you want). */
-add_action( 'send_headers', function () {
-	if ( is_admin() ) return;
-
-	$path = (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH );
-	if ( strpos( $path, '/quiz/' ) === 0 || strpos( $path, '/index.php/quiz/' ) === 0 ) {
-		header( 'X-IKA-Quiz-Router: active' );
-	}
-} );
-
-/* Resolve /quiz/{parent}/{child}/ (and deeper) to the child quiz post. */
-add_filter( 'request', function( $qv ) {
-
-	if ( is_admin() ) {
-		return $qv;
-	}
-
-	$path = trim( (string) wp_parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH ), '/' );
-	if ( $path === '' ) {
-		return $qv;
-	}
-
-	// Support /index.php/quiz/... as well.
-	if ( strpos( $path, 'index.php/' ) === 0 ) {
-		$path = ltrim( substr( $path, 10 ), '/' );
-	}
-
-	if ( strpos( $path, 'quiz/' ) !== 0 ) {
-		return $qv;
-	}
-
-	$rel = trim( substr( $path, 5 ), '/' ); // strip 'quiz/'
-	if ( $rel === '' ) {
-		return $qv;
-	}
-
-	$parts = array_values( array_filter( explode( '/', $rel ) ) );
-
-	// Only handle multi-segment paths (parent/child or deeper).
-	if ( count( $parts ) < 2 ) {
-		return $qv;
-	}
-
-	$parent_slug = sanitize_title( (string) $parts[0] );
-	$child_slug  = sanitize_title( (string) $parts[ count( $parts ) - 1 ] );
-
-	// Resolve the child quiz by slug.
-	$child = get_page_by_path( $child_slug, OBJECT, 'quiz' );
-	if ( ! $child || empty( $child->ID ) ) {
-		$found = get_posts( [
-			'name'           => $child_slug,
-			'post_type'      => 'quiz',
-			'post_status'    => 'publish',
-			'posts_per_page' => 1,
-			'no_found_rows'  => true,
-		] );
-		$child = $found ? $found[0] : null;
-	}
-
-	if ( ! $child || empty( $child->ID ) ) {
-		return $qv;
-	}
-
-	// Validate that the requested parent slug is actually in the ancestor chain.
-	$ancestors = get_post_ancestors( $child );
-	$ok = false;
-	foreach ( $ancestors as $aid ) {
-		if ( get_post_field( 'post_name', $aid ) === $parent_slug ) {
-			$ok = true;
-			break;
-		}
-	}
-
-	if ( ! $ok ) {
-		return $qv;
-	}
-
-	// Force WP to load the child quiz post.
-	return [
-		'post_type' => 'quiz',
-		'p'         => (int) $child->ID,
-		'name'      => $child->post_name,
-	];
-
-}, 0 );
-
-add_filter( 'redirect_canonical', function( $redirect_url, $requested_url ) {
-
-	$path = (string) wp_parse_url( $requested_url, PHP_URL_PATH );
-
-	if ( strpos( $path, '/quiz/' ) === 0 || strpos( $path, '/index.php/quiz/' ) === 0 ) {
-		return false;
-	}
-
-	return $redirect_url;
-
-}, 10, 2 );
-
-
-
 
 /**
  * Core modules (keep always-on unless you have a reason to gate them)
@@ -191,7 +74,6 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-taxonomies.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro/quiz-wrapper.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-rewrites.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-hierarchy-router.php';
 
 /**
  * Optional improvement:
