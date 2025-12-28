@@ -39,7 +39,60 @@ if ( ! function_exists( 'ika_gam_is_quiz_single' ) ) {
     function ika_gam_is_quiz_single(): bool {
         return function_exists( 'is_singular' ) && is_singular( 'quiz' );
     }
+
 }
+/**
+ * Helper: is this the Flight Deck / Profile Hub page?
+ *
+ * We keep this conservative + production-safe:
+ *  - Only on singular pages
+ *  - Checks for a wrapper marker in post content to avoid hardcoding IDs
+ */
+if ( ! function_exists( 'ika_gam_is_flightdeck_page' ) ) {
+    function ika_gam_is_flightdeck_page(): bool {
+
+        // Fast + explicit: Flight Deck page slug.
+        // (This avoids relying on Elementor-rendered content, which is usually stored in post meta.)
+        if ( function_exists( 'is_page' ) && is_page( 'flight-deck' ) ) {
+            return true;
+        }
+
+        // Fallback: search for wrapper markers in post_content and Elementor stored layout JSON.
+        if ( ! function_exists( 'is_singular' ) || ! is_singular() ) {
+            return false;
+        }
+
+        global $post;
+        if ( ! $post ) {
+            return false;
+        }
+
+        $needles = array(
+            'ika-scope-flightdeck',
+            'ika-profile-hub',
+            'ika-hub-hero',
+        );
+
+        // Check classic post_content.
+        $content = (string) ( $post->post_content ?? '' );
+        foreach ( $needles as $needle ) {
+            if ( $content && stripos( $content, $needle ) !== false ) {
+                return true;
+            }
+        }
+
+        // Check Elementor stored layout JSON (most common for Elementor pages).
+        $edata = (string) get_post_meta( $post->ID, '_elementor_data', true );
+        foreach ( $needles as $needle ) {
+            if ( $edata && stripos( $edata, $needle ) !== false ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 
 add_action( 'wp_enqueue_scripts', function () {
 
@@ -51,6 +104,19 @@ add_action( 'wp_enqueue_scripts', function () {
         array(),
         ika_gam_asset_ver( $master_rel )
     );
+
+
+
+    // 1b) Flight Deck / Profile Hub CSS (only on the Flight Deck page)
+    if ( ika_gam_is_flightdeck_page() ) {
+        $fd_rel = '/assets/css/ika_flightdeck.css';
+        wp_enqueue_style(
+            'ika-flightdeck',
+            IKA_GAM_PLUGIN_URL . $fd_rel,
+            array( 'ika-master' ),
+            ika_gam_asset_ver( $fd_rel )
+        );
+    }
 
     // 2) WatuPRO quiz + results theme CSS (ONLY on single Quiz CPT pages)
     if ( ika_gam_is_quiz_single() ) {
