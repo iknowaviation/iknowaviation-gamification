@@ -8,14 +8,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * What this file does:
  *  - Enqueues site-wide master UI CSS (ika_master.css)
- *  - Enqueues quiz hub CSS (ika_quiz.css) on Quiz CPT single + archive
- *  - Enqueues WatuPRO quiz/results theme CSS ONLY on single Quiz CPT pages
+ *  - Enqueues WatuPRO quiz theme CSS ONLY on single Quiz CPT pages
+ *  - Enqueues WatuPRO results theme CSS ONLY on single Quiz CPT pages
  *  - Enqueues Watu Play modal CSS ONLY on single Quiz CPT pages
  *  - Enqueues jQuery UI Dialog for logged-in users (used by some UI modals)
  *
  * Notes:
  *  - We use filemtime() for cache-busting.
- *  - Keep quiz/results CSS in the plugin to avoid theme-path fragility.
  * ======================================================================*/
 
 if ( ! function_exists( 'ika_gam_asset_ver' ) ) {
@@ -42,18 +41,9 @@ if ( ! function_exists( 'ika_gam_is_quiz_single' ) ) {
     }
 }
 
-/**
- * Helper: are we on a Quiz CPT archive?
- */
-if ( ! function_exists( 'ika_gam_is_quiz_archive' ) ) {
-    function ika_gam_is_quiz_archive(): bool {
-        return function_exists( 'is_post_type_archive' ) && is_post_type_archive( 'quiz' );
-    }
-}
-
 add_action( 'wp_enqueue_scripts', function () {
 
-    // 1) Site-wide master UI CSS
+    // 1) Site-wide master UI CSS (includes Quiz Hub / archive UI)
     $master_rel = '/assets/css/ika_master.css';
     wp_enqueue_style(
         'ika-master',
@@ -62,29 +52,26 @@ add_action( 'wp_enqueue_scripts', function () {
         ika_gam_asset_ver( $master_rel )
     );
 
-    // 2) Quiz hub / archive styling (cards, rails, etc.)
-    if ( ika_gam_is_quiz_single() || ika_gam_is_quiz_archive() ) {
-        $quiz_rel = '/assets/css/ika_quiz.css';
+    // 2) WatuPRO quiz + results theme CSS (ONLY on single Quiz CPT pages)
+    if ( ika_gam_is_quiz_single() ) {
+
+        $quiz_rel = '/assets/css/ika_watupro_quiz.css';
         wp_enqueue_style(
-            'ika-quiz',
+            'ika-watupro-quiz',
             IKA_GAM_PLUGIN_URL . $quiz_rel,
             array( 'ika-master' ),
             ika_gam_asset_ver( $quiz_rel )
         );
-    }
 
-    // 3) WatuPRO quiz + results theme CSS (migrated into plugin for stability)
-    // Load only on single Quiz CPT pages where the [watupro] shortcode runs.
-    if ( ika_gam_is_quiz_single() ) {
-        $watupro_rel = '/assets/css/iknowaviation-quiz-theme.css';
+        $results_rel = '/assets/css/ika_watupro_results.css';
         wp_enqueue_style(
-            'ika-watupro-theme',
-            IKA_GAM_PLUGIN_URL . $watupro_rel,
-            array( 'ika-master' ),
-            ika_gam_asset_ver( $watupro_rel )
+            'ika-watupro-results',
+            IKA_GAM_PLUGIN_URL . $results_rel,
+            array( 'ika-master', 'ika-watupro-quiz' ),
+            ika_gam_asset_ver( $results_rel )
         );
 
-        // 3b) Watu Play modal styling (badge/level modal)
+        // Watu Play modal styling (badge/level modal)
         $modal_rel = '/assets/css/ika_watuproplay_modal.css';
         wp_enqueue_style(
             'ika-watuproplay-modal',
@@ -94,7 +81,7 @@ add_action( 'wp_enqueue_scripts', function () {
         );
     }
 
-    // 4) jQuery UI Dialog (used by some UI bits)
+    // 3) jQuery UI Dialog (used by some UI bits)
     if ( is_user_logged_in() ) {
         wp_enqueue_script( 'jquery-ui-dialog' );
         wp_enqueue_style( 'wp-jquery-ui-dialog' );
