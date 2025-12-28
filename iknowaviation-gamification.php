@@ -3,7 +3,7 @@
  * Plugin Name: iKnowAviation – Gamification Engine
  * Description: Centralized gamification logic for WatuPRO, Watu Play, UsersWP, and Daily Missions.
  * Author: I Know Aviation LLC
- * Version: 1.1.0
+ * Version: 1.2.2
  * Text Domain: iknowaviation-gamification
  */
 
@@ -14,9 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Constants
  */
-define( 'IKA_GAM_PLUGIN_VERSION', '1.1.0' );
+define( 'IKA_GAM_PLUGIN_VERSION', '1.2.2' );
 define( 'IKA_GAM_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
-define( 'IKA_GAM_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
+define( 'IKA_GAM_PLUGIN_URL',  untrailingslashit( plugin_dir_url( __FILE__ ) ) );
 
 
 /**
@@ -40,6 +40,7 @@ require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-taxonomies.php';
 require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-wrapper.php';
+require_once IKA_GAM_PLUGIN_PATH . 'includes/frontend-deps.php';
 
 /**
  * Optional improvement:
