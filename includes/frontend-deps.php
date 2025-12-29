@@ -94,6 +94,53 @@ if ( ! function_exists( 'ika_gam_is_flightdeck_page' ) ) {
 }
 
 
+if ( ! function_exists( 'ika_gam_page_has_marker' ) ) {
+    /**
+     * Searches post_content and Elementor _elementor_data for marker strings.
+     *
+     * Elementor pages often store layout content in `_elementor_data` instead of `post_content`,
+     * so we check both.
+     */
+    function ika_gam_page_has_marker( array $needles ): bool {
+        if ( ! function_exists( 'is_singular' ) || ! is_singular() ) {
+            return false;
+        }
+
+        global $post;
+        if ( ! $post ) {
+            return false;
+        }
+
+        $content = (string) ( $post->post_content ?? '' );
+        $edata   = (string) get_post_meta( $post->ID, '_elementor_data', true );
+
+        foreach ( $needles as $needle ) {
+            if ( ( $content && stripos( $content, $needle ) !== false ) ||
+                 ( $edata   && stripos( $edata,   $needle ) !== false ) ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+if ( ! function_exists( 'ika_gam_is_flightdeck_subpage' ) ) {
+    /**
+     * Detect Flight Deck sub-pages by either:
+     * - direct page slug match (works well for child pages like /flight-deck/missions/), OR
+     * - marker match in content/Elementor data
+     */
+    function ika_gam_is_flightdeck_subpage( string $slug, string $marker ): bool {
+        if ( function_exists( 'is_page' ) && is_page( $slug ) ) {
+            return true;
+        }
+
+        return ika_gam_page_has_marker( array( $marker ) );
+    }
+}
+
+
 add_action( 'wp_enqueue_scripts', function () {
 
     // 1) Site-wide master UI CSS (includes Quiz Hub / archive UI)
@@ -116,7 +163,30 @@ add_action( 'wp_enqueue_scripts', function () {
             array( 'ika-master' ),
             ika_gam_asset_ver( $fd_rel )
         );
-    }
+    
+
+        // Flight Deck sub-page add-ons (only load when page matches)
+        // Pages: /flight-deck/missions/ and /flight-deck/badges/
+        if ( ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ) {
+            $rel = '/assets/css/ika_flightdeck_missions.css';
+            wp_enqueue_style(
+                'ika-flightdeck-missions',
+                IKA_GAM_PLUGIN_URL . $rel,
+                array( 'ika-master', 'ika-flightdeck' ),
+                ika_gam_asset_ver( $rel )
+            );
+        }
+
+        if ( ika_gam_is_flightdeck_subpage( 'badges', 'ika-fd-marker--badges' ) ) {
+            $rel = '/assets/css/ika_flightdeck_badges.css';
+            wp_enqueue_style(
+                'ika-flightdeck-badges',
+                IKA_GAM_PLUGIN_URL . $rel,
+                array( 'ika-master', 'ika-flightdeck' ),
+                ika_gam_asset_ver( $rel )
+            );
+        }
+}
 
     // 2) WatuPRO quiz + results theme CSS (ONLY on single Quiz CPT pages)
     if ( ika_gam_is_quiz_single() ) {

@@ -1,0 +1,24 @@
+/*
+ * iKnowAviation – Flight Deck: Badges (Shell)
+ * Page: /flight-deck/badges/
+ *
+ * Conventions:
+ *  - Wrapper: .ika-scope-flightdeck
+ *  - Page modifier: .ika-fd--badges
+ *  - Marker: .ika-fd-marker--badges
+ *
+ * This file is intentionally minimal. Shared Flight Deck styling lives in:
+ *  - assets/css/ika_flightdeck.css
+ */
+
+.ika-scope-flightdeck.ika-fd--badges {
+  /* Page-level tweaks go here */
+}
+
+.ika-scope-flightdeck.ika-fd--badges .ika-fd__section {
+  /* Section spacing overrides if needed */
+}
+
+.ika-scope-flightdeck.ika-fd--badges .ika-fd-card {
+  /* Badge grid / badge cards */
+}
