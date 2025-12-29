@@ -62,23 +62,7 @@
   --ika-text-main: #111827;
   --ika-text-muted: #6B7280;
   --ika-white: #ffffff;
-
-/* --- APP / UI TOKENS (canonical) --- */
---ika-body-size: 1rem;
---ika-h1-size: 2.25rem;
---ika-h2-size: 1.75rem;
-
---ika-space-xs: 6px;
---ika-space-sm: 10px;
---ika-space-md: 16px;
---ika-space-lg: 24px;
-
-/* Page/panel backgrounds (used by helper classes like .ika-bg--dark) */
---ika-page-bg-light: var(--ika-surface-100);
---ika-page-bg-dark: var(--ika-navy-900);
---ika-panel-bg-dark: rgba(13, 19, 31, 0.88);
 }
-
 
 /* ==========================================================================
    LAYOUT UTILITIES — apply these as CSS classes on Elementor top containers

@@ -63,7 +63,7 @@
   overflow: hidden;
   box-shadow: 0 22px 48px rgba(4, 13, 33, 0.4);
   font-family: "Open Sans", system-ui, sans-serif;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   color: #e4eeff;
 }
 
@@ -231,7 +231,7 @@
 /* HERO METRICS STRIP */
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-metrics {
   padding: 0 18px 18px;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-metrics-inner {
@@ -277,7 +277,8 @@
 
 /* GENERIC SECTION WRAPPERS */
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-section {
-  padding: 18px 22px 6px;
+  padding: var(--ika-space-lg, 24px) var(--ika-space-lg, 24px) var(--ika-space-sm, 10px);
+  margin-bottom: var(--ika-space-lg, 24px);
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header {
@@ -375,7 +376,7 @@
   position: relative !important;
   height: 6px;
   border-radius: 999px;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   overflow: hidden;
 }
 
@@ -425,7 +426,7 @@
   position: relative !important;
   height: 6px;
   border-radius: 999px;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   overflow: hidden;
 }
 
@@ -550,7 +551,7 @@
   height: 56px;
   margin: 0 auto 6px;
   border-radius: 999px;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -631,7 +632,7 @@
   display: inline-flex;
   padding: 2px;
   border-radius: 999px;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   border: 1px solid #18355c;
 }
 
@@ -720,7 +721,7 @@
   padding: 4px 9px;
   border-radius: 999px;
   border: 1px solid #18355c;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   color: #e4eeff;
 }
 
@@ -737,7 +738,7 @@
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-flightlog-table thead {
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-flightlog-table th {
@@ -825,7 +826,7 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #e4eeff;
-  background: #020818;
+  background: var(--ika-page-bg-dark, #020818);
   text-decoration: none;
   align-self: flex-start;
 }
@@ -974,70 +975,80 @@
 
 /* =========================================================
 
-/* =========================================================
-   RECOMMENDATIONS RAIL (Flight Deck)
-   Safe Phase-1 styling (no JS)
-========================================================= */
-.ika-scope-flightdeck .ika-rec-rail{
-  margin-top: var(--ika-space-md, 16px);
+
+/* === Recommended Next (Recommendation Rail) === */
+.ika-scope-flightdeck .ika-rec-rail {
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: var(--ika-space-md, 16px);
 }
-.ika-scope-flightdeck .ika-rec-rail__head{
+
+.ika-scope-flightdeck .ika-rec-rail__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--ika-space-md, 16px);
   margin-bottom: var(--ika-space-md, 16px);
 }
-.ika-scope-flightdeck .ika-rec-rail__title{
-  font-weight: 700;
+
+.ika-scope-flightdeck .ika-rec-rail__title {
   font-size: 1.05rem;
-  letter-spacing: .2px;
-  margin-bottom: var(--ika-space-xs, 6px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
-.ika-scope-flightdeck .ika-rec-rail__sub{
-  opacity: .85;
-  line-height: 1.45;
+
+.ika-scope-flightdeck .ika-rec-rail__sub {
+  opacity: 0.8;
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
-.ika-scope-flightdeck .ika-rec-rail__grid{
+
+.ika-scope-flightdeck .ika-rec-rail__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ika-space-md, 16px);
 }
-@media (max-width: 1024px){
-  .ika-scope-flightdeck .ika-rec-rail__grid{ grid-template-columns: 1fr; }
+
+@media (max-width: 960px) {
+  .ika-scope-flightdeck .ika-rec-rail__grid {
+    grid-template-columns: 1fr;
+  }
 }
-.ika-scope-flightdeck .ika-rec-card{
+
+.ika-scope-flightdeck .ika-rec-card {
   display: block;
   text-decoration: none;
-  border-radius: 18px;
+  color: inherit;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
   padding: var(--ika-space-md, 16px);
-  border: 1px solid rgba(98,169,242,.25);
-  background: rgba(8,16,36,.55);
-  box-shadow: 0 10px 24px rgba(0,0,0,.25);
-  transition: transform .15s ease, border-color .15s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
-.ika-scope-flightdeck .ika-rec-card:hover{
-  transform: translateY(-2px);
-  border-color: rgba(98,169,242,.45);
+
+.ika-scope-flightdeck .ika-rec-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.32);
 }
-.ika-scope-flightdeck .ika-rec-card__kicker{
-  text-transform: uppercase;
-  font-size: .72rem;
-  letter-spacing: .14em;
-  opacity: .75;
-  margin-bottom: var(--ika-space-xs, 6px);
-}
-.ika-scope-flightdeck .ika-rec-card__title{
+
+.ika-scope-flightdeck .ika-rec-card__title {
   font-weight: 700;
-  font-size: 1.05rem;
   margin-bottom: var(--ika-space-xs, 6px);
 }
-.ika-scope-flightdeck .ika-rec-card__meta{
-  opacity: .85;
-  line-height: 1.45;
-  margin-bottom: var(--ika-space-sm, 10px);
+
+.ika-scope-flightdeck .ika-rec-card__meta {
+  opacity: 0.85;
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
-.ika-scope-flightdeck .ika-rec-card__cta{
+
+.ika-scope-flightdeck .ika-rec-card__cta {
+  margin-top: var(--ika-space-sm, 10px);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  opacity: .95;
+  opacity: 0.95;
 }
-

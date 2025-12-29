@@ -16,149 +16,82 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 define( 'IKA_GAM_PLUGIN_VERSION', '1.2.2' );
 define( 'IKA_GAM_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
-define( 'IKA_GAM_PLUGIN_URL',  untrailingslashit( plugin_dir_url( __FILE__ ) ) );
-
+define( 'IKA_GAM_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 
 /**
  * Feature flags MUST load before conditional includes.
  */
 require_once IKA_GAM_PLUGIN_PATH . 'includes/feature-flags.php';
 
-
-// NOTE: We intentionally avoid any custom rewrite/router logic for quiz URLs.
-// Quizzes use stable flat permalinks like: /quiz/{quiz-slug}/
-// Track alignment and course grouping is handled via taxonomies + post meta,
-// not via URL hierarchy.
-
-
-
-
 /**
- * Core modules (keep always-on unless you have a reason to gate them)
+ * Helper: safe include (prevents fatal if a file was not uploaded yet)
  */
-require_once IKA_GAM_PLUGIN_PATH . 'includes/ranks-xp-core.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/stats-rebuild.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-taxonomies.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/quiz-wrapper.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/frontend-deps.php';
-
-/**
- * Optional improvement:
- * Gate WatuPRO-related hooks behind the XP flag so a Watu/XP subsystem issue
- * can be turned off without taking down the whole plugin.
- */
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'xp' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro-hooks-admin.php';
-}
-
-/**
- * Optional modules behind flags (turn on/off in Debug Panel)
- */
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'xp' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/watupro-dashboard-shortcodes.php';
-}
-
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'streaks' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/streaks-status.php';
-}
-
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'ranks' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/hero-metrics-shortcodes.php';
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/rank-card-shortcodes.php';
-}
-
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'leaderboard' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/leaderboard.php';
-}
-
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'watuplay' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/watuplay-avatar-modal.php';
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/watuproplay-levels.php';
-}
-
-if ( function_exists( 'ika_gam_feature_enabled' ) && ika_gam_feature_enabled( 'admin_tools' ) ) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-debug-panel.php';
-}
-
-/**
- * Admin settings + tools (you can gate these later if desired)
- */
-require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-menu-settings.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/admin-tools-shortcodes.php';
-require_once IKA_GAM_PLUGIN_PATH . 'includes/tools/class-ika-watupro-importer.php';
-
-/**
- * Daily Missions subsystem (optional + file-exists safe)
- */
-if (
-	function_exists( 'ika_gam_feature_enabled' )
-	&& ika_gam_feature_enabled( 'missions' )
-	&& file_exists( IKA_GAM_PLUGIN_PATH . 'includes/daily-missions.php' )
-) {
-	require_once IKA_GAM_PLUGIN_PATH . 'includes/daily-missions.php';
-}
-
-/**
- * Bootstrap hook (future use)
- */
-add_action( 'plugins_loaded', function() {
-	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-		error_log( '[IKA] Gamification Engine loaded: ' . IKA_GAM_PLUGIN_VERSION );
-	}
-} );
-
-/**
- * Show plugin version in WP Admin → Plugins list
- */
-add_filter( 'plugin_row_meta', function( $links, $file ) {
-
-	if ( plugin_basename( __FILE__ ) === $file ) {
-		$links[] = sprintf(
-			'IKA Version: <strong>%s</strong>',
-			esc_html( IKA_GAM_PLUGIN_VERSION )
-		);
-	}
-
-	return $links;
-
-}, 10, 2 );
-
-/**
- * Admin-only dependency notice (non-fatal).
- */
-add_action( 'admin_notices', function() {
-
-	if ( ! current_user_can( 'manage_options' ) ) {
-		return;
-	}
-
-	if ( ! function_exists( 'is_plugin_active' ) ) {
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-	}
-
-	// IMPORTANT: These are the slugs you confirmed are correct on your site.
-	$required = array(
-		'Watu PRO'      => 'watupro/watupro.php',
-		'Watu PRO Play' => 'watupro-play/watupro-play.php',
-		'UsersWP'       => 'userswp/userswp.php',
-	);
-
-	$missing = array();
-
-	foreach ( $required as $label => $slug ) {
-		if ( ! is_plugin_active( $slug ) ) {
-			$missing[] = $label;
+if ( ! function_exists( 'ika_gam_safe_require' ) ) {
+	function ika_gam_safe_require( string $rel_path ) : void {
+		$full = IKA_GAM_PLUGIN_PATH . ltrim( $rel_path, '/' );
+		if ( file_exists( $full ) ) {
+			require_once $full;
 		}
 	}
+}
 
-	if ( empty( $missing ) ) {
-		return;
-	}
+/**
+ * Core modules (always-on)
+ */
+ika_gam_safe_require( 'includes/ranks-xp-core.php' );
+ika_gam_safe_require( 'includes/stats-rebuild.php' );
+ika_gam_safe_require( 'includes/quiz-taxonomies.php' );
+ika_gam_safe_require( 'includes/quiz-wrapper.php' );
+ika_gam_safe_require( 'includes/frontend-deps.php' );
 
-	echo '<div class="notice notice-warning"><p>';
-	echo '<strong>iKnowAviation – Gamification Engine:</strong> ';
-	echo 'The following required plugin(s) are inactive: ';
-	echo esc_html( implode( ', ', $missing ) );
-	echo '. Some gamification features may not work until they are activated.';
-	echo '</p></div>';
-} );
+/**
+ * WatuPRO admin hooks + dashboards
+ */
+ika_gam_safe_require( 'includes/watupro-hooks-admin.php' );
+ika_gam_safe_require( 'includes/watupro-dashboard-shortcodes.php' );
+
+/**
+ * Streaks + user status
+ */
+ika_gam_safe_require( 'includes/streaks-status.php' );
+
+/**
+ * Rank/XP shortcodes (Flight Deck)
+ * NOTE: These MUST be loaded for [ika_rank_*] and [ika_xp_*] shortcodes to work.
+ */
+ika_gam_safe_require( 'includes/hero-metrics-shortcodes.php' );
+ika_gam_safe_require( 'includes/rank-card-shortcodes.php' );
+
+/**
+ * Recommendations rail (Flight Deck + Results)
+ * NOTE: If this file isn't present on the server yet, safe include prevents a fatal.
+ */
+ika_gam_safe_require( 'includes/recommendations-shortcodes.php' );
+
+/**
+ * Leaderboard
+ */
+ika_gam_safe_require( 'includes/leaderboard.php' );
+
+/**
+ * Watu Play modal + levels
+ */
+ika_gam_safe_require( 'includes/watuplay-avatar-modal.php' );
+ika_gam_safe_require( 'includes/watuproplay-levels.php' );
+
+/**
+ * Admin UI
+ */
+ika_gam_safe_require( 'includes/admin-debug-panel.php' );
+ika_gam_safe_require( 'includes/admin-menu-settings.php' );
+ika_gam_safe_require( 'includes/admin-tools-shortcodes.php' );
+
+/**
+ * Importer
+ */
+ika_gam_safe_require( 'includes/tools/class-ika-watupro-importer.php' );
+
+/**
+ * Daily missions scaffold
+ */
+ika_gam_safe_require( 'includes/daily-missions.php' );

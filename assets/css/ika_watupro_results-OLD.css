@@ -36,19 +36,15 @@
 
 .ika-results-main {
   padding: 22px 24px 20px;
-  background: var(--ika-page-bg-dark, #020818);
+  background: #020818;
 }
 
 /* RESULTS PAGE – PREVENT TEXT OVERLAP IN MAIN CONTENT */
 .ika-results-main,
 .ika-results-main * {
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
-
-.ika-results-main {
-  font-size: var(--ika-body-size, 1rem);
-}
 /* stats row */
 
 .ika-stats-grid {
@@ -176,7 +172,7 @@
 /* answers section */
 
 .ika-answer-section {
-  background: var(--ika-page-bg-dark, #020818);
+  background: #020818;
   padding-top: 4px;
   border-top: 1px solid #13243e;
 }
