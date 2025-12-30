@@ -20,10 +20,14 @@ add_shortcode( 'ika_recommendations_rail', function( $atts = [] ) {
     $atts = shortcode_atts( [
         'context' => 'flightdeck',
         'limit'   => 3,
+        'show_header' => 1,
     ], $atts, 'ika_recommendations_rail' );
 
     $context = sanitize_key( $atts['context'] );
     $limit   = max( 1, min( 6, intval( $atts['limit'] ) ) );
+
+    $tmp = isset( $atts['show_header'] ) ? filter_var( $atts['show_header'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE ) : null;
+    $show_header = ( $tmp === null ) ? true : (bool) $tmp;
 
     // Base URLs (stable, no assumptions about future routing)
     $quiz_hub_url = home_url( '/quizzes/' );
@@ -34,8 +38,10 @@ add_shortcode( 'ika_recommendations_rail', function( $atts = [] ) {
         ob_start(); ?>
         <div class="ika-rec-rail ika-rec-rail--loggedout" data-context="<?php echo esc_attr( $context ); ?>">
             <div class="ika-rec-rail__head">
-                <div class="ika-rec-rail__title">Recommended Next</div>
-                <div class="ika-rec-rail__sub">Log in to get personalized picks based on your quiz history.</div>
+                <?php if ( ! empty( $show_header ) ) : ?>
+                    <h2 class="ika-hub-section-title">Recommended Next</h2>
+                    <p class="ika-hub-section-kicker">A few smart picks to keep you moving—without the overwhelm.</p>
+                <?php endif; ?>
             </div>
             <div class="ika-rec-rail__grid">
                 <a class="ika-rec-card" href="<?php echo esc_url( $login_url ); ?>">
@@ -80,8 +86,10 @@ add_shortcode( 'ika_recommendations_rail', function( $atts = [] ) {
     ob_start(); ?>
     <div class="ika-rec-rail" data-context="<?php echo esc_attr( $context ); ?>">
         <div class="ika-rec-rail__head">
-            <div class="ika-rec-rail__title">Recommended Next</div>
-            <div class="ika-rec-rail__sub">A few picks to keep you moving—without the overwhelm.</div>
+            <?php if ( ! empty( $show_header ) ) : ?>
+                <h2 class="ika-hub-section-title">Recommended Next</h2>
+                <p class="ika-hub-section-kicker">A few smart picks to keep you moving—without the overwhelm.</p>
+            <?php endif; ?>
         </div>
 
         <div class="ika-rec-rail__grid">

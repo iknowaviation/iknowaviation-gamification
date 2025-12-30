@@ -63,10 +63,35 @@ ika_gam_safe_require( 'includes/hero-metrics-shortcodes.php' );
 ika_gam_safe_require( 'includes/rank-card-shortcodes.php' );
 
 /**
+ * Missions (Flight Deck dashboard preview)
+ */
+ika_gam_safe_require( 'includes/missions-shortcodes.php' );
+
+/**
+ * Badges (Flight Deck dashboard preview)
+ */
+ika_gam_safe_require( 'includes/badges-shortcodes.php' );
+
+/**
+ * Flight Log (Flight Deck dashboard preview)
+ */
+ika_gam_safe_require( 'includes/flightlog-shortcodes.php' );
+
+/**
+ * Leaderboard (Flight Deck wrapper)
+ */
+ika_gam_safe_require( 'includes/leaderboard-shortcodes.php' );
+
+/**
  * Recommendations rail (Flight Deck + Results)
  * NOTE: If this file isn't present on the server yet, safe include prevents a fatal.
  */
 ika_gam_safe_require( 'includes/recommendations-shortcodes.php' );
+
+/**
+ * Rank ladder helpers (Flight Deck)
+ */
+ika_gam_safe_require( 'includes/rank-ladder-shortcodes.php' );
 
 /**
  * Leaderboard

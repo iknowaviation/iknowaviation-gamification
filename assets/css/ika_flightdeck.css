@@ -4,6 +4,7 @@
  * Scope: primarily .ika-scope-flightdeck wrapper.
  */
 
+/* =========================================================
    AVATAR LEVEL RING + LEVEL BADGE
    ========================================================= */
 
@@ -972,72 +973,644 @@
   }
 }
 
-/* =========================================================
+/* ========================================================= */
 
 /* =========================================================
-   RECOMMENDATIONS RAIL (Flight Deck)
-   Safe Phase-1 styling (no JS)
+   Flight Deck – Flight Log (v2 shortcode markup)
+   Fixes: restore left summary card + prevent label/value overlap
+   Scoped: .ika-scope-flightdeck only
 ========================================================= */
-.ika-scope-flightdeck .ika-rec-rail{
-  margin-top: var(--ika-space-md, 16px);
+
+.ika-scope-flightdeck .ika-fd-flightlog-layout{
+  display: grid !important;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  margin-top: 12px;
 }
-.ika-scope-flightdeck .ika-rec-rail__head{
-  margin-bottom: var(--ika-space-md, 16px);
+
+.ika-scope-flightdeck .ika-fd-flightlog-summary,
+.ika-scope-flightdeck .ika-fd-flightlog-tablecard{
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
 }
-.ika-scope-flightdeck .ika-rec-rail__title{
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: .2px;
-  margin-bottom: var(--ika-space-xs, 6px);
+
+.ika-scope-flightdeck .ika-fd-flightlog-summary__title{
+  font-weight: 800;
+  font-size: 1.35rem;
+  margin: 2px 0 12px;
+  line-height: 1.15;
 }
-.ika-scope-flightdeck .ika-rec-rail__sub{
-  opacity: .85;
+
+.ika-scope-flightdeck .ika-fd-flightlog-statlist{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-stat{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 14px;
   line-height: 1.45;
 }
-.ika-scope-flightdeck .ika-rec-rail__grid{
+
+.ika-scope-flightdeck .ika-fd-flightlog-label{
+  opacity: .85;
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-stat > span:last-child{
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Controls row */
+.ika-scope-flightdeck .ika-fd-flightlog-controls{
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-controls .ika-hub-section-kicker{
+  margin: 0;
+  line-height: 1.25;
+  opacity: .85;
+}
+
+/* Select – keep on-brand even when disabled */
+.ika-scope-flightdeck .ika-fd-flightlog-filter{
+  min-width: 200px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.20);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: inherit;
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-filter:disabled{
+  opacity: 1;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.84);
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* Table spacing */
+.ika-scope-flightdeck .ika-fd-table-scroll{
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-table{
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.ika-scope-flightdeck .ika-fd-flightlog-table th,
+.ika-scope-flightdeck .ika-fd-flightlog-table td{
+  padding: 12px 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  text-align: left;
+  font-size: .95rem;
+}
+
+/* Responsive */
+@media (max-width: 920px){
+  .ika-scope-flightdeck .ika-fd-flightlog-layout{
+    grid-template-columns: 1fr !important;
+  }
+  .ika-scope-flightdeck .ika-fd-flightlog-table{
+    min-width: 520px;
+  }
+}
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-fd-flightlog-controls{
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .ika-scope-flightdeck .ika-fd-flightlog-filter{
+    width: 100%;
+  }
+}
+
+
+/* =========================================================
+   Flight Deck – Leaderboard wrapper (dashboard)
+   Safe shell styles. Scoped to Flight Deck.
+========================================================= */
+.ika-scope-flightdeck .ika-fd-leaderboard-headrow{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-label{
+  opacity: .85;
+  font-size: .95rem;
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-tabs{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.ika-scope-flightdeck .ika-fd-tab{
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:.82rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: inherit;
+  cursor: default; /* Phase 1 shell (non-interactive) */
+}
+
+.ika-scope-flightdeck .ika-fd-tab.is-active{
+  background: rgba(98,169,242,0.16);
+  border-color: rgba(98,169,242,0.32);
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-card{
+  border-radius:16px;
+  padding:14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-empty{
+  margin-top:12px;
+  border-radius:16px;
+  padding:16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-empty__title{
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+.ika-scope-flightdeck .ika-fd-leaderboard-empty__meta{
+  opacity:.9;
+  line-height:1.45;
+  margin-bottom:8px;
+}
+
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-fd-leaderboard-headrow{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+}
+
+
+/* =========================================================
+   RECOMMENDED NEXT (Recommendation Rail)
+   Restored styles
+========================================================= */
+/* === Recommended Next (Recommendation Rail) === */
+.ika-scope-flightdeck .ika-rec-rail {
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: var(--ika-space-md, 16px);
+}
+
+.ika-scope-flightdeck .ika-rec-rail__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--ika-space-md, 16px);
+  margin-bottom: var(--ika-space-md, 16px);
+}
+
+.ika-scope-flightdeck .ika-rec-rail__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.ika-scope-flightdeck .ika-rec-rail__sub {
+  opacity: 0.8;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.ika-scope-flightdeck .ika-rec-rail__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ika-space-md, 16px);
 }
-@media (max-width: 1024px){
-  .ika-scope-flightdeck .ika-rec-rail__grid{ grid-template-columns: 1fr; }
+
+@media (max-width: 960px) {
+  .ika-scope-flightdeck .ika-rec-rail__grid {
+    grid-template-columns: 1fr;
+  }
 }
-.ika-scope-flightdeck .ika-rec-card{
+
+.ika-scope-flightdeck .ika-rec-card {
   display: block;
   text-decoration: none;
-  border-radius: 18px;
+  color: inherit;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
   padding: var(--ika-space-md, 16px);
-  border: 1px solid rgba(98,169,242,.25);
-  background: rgba(8,16,36,.55);
-  box-shadow: 0 10px 24px rgba(0,0,0,.25);
-  transition: transform .15s ease, border-color .15s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
-.ika-scope-flightdeck .ika-rec-card:hover{
-  transform: translateY(-2px);
-  border-color: rgba(98,169,242,.45);
+
+.ika-scope-flightdeck .ika-rec-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.32);
 }
-.ika-scope-flightdeck .ika-rec-card__kicker{
-  text-transform: uppercase;
-  font-size: .72rem;
-  letter-spacing: .14em;
-  opacity: .75;
-  margin-bottom: var(--ika-space-xs, 6px);
-}
-.ika-scope-flightdeck .ika-rec-card__title{
+
+.ika-scope-flightdeck .ika-rec-card__title {
   font-weight: 700;
-  font-size: 1.05rem;
   margin-bottom: var(--ika-space-xs, 6px);
 }
-.ika-scope-flightdeck .ika-rec-card__meta{
-  opacity: .85;
-  line-height: 1.45;
-  margin-bottom: var(--ika-space-sm, 10px);
+
+.ika-scope-flightdeck .ika-rec-card__meta {
+  opacity: 0.85;
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
-.ika-scope-flightdeck .ika-rec-card__cta{
+
+.ika-scope-flightdeck .ika-rec-card__cta {
+  margin-top: var(--ika-space-sm, 10px);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  opacity: .95;
+  opacity: 0.95;
 }
 
+
+
+/* =========================================================
+   MISSIONS (Preview cards)
+   Restored styles
+========================================================= */
+/* =========================================================
+   Flight Deck – Missions Preview (dashboard)
+   Safe shell styles (Phase 1). Scoped to Flight Deck.
+========================================================= */
+.ika-scope-flightdeck .ika-dm-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+  margin-top:12px;
+}
+
+.ika-scope-flightdeck .ika-dm-card{
+  display:block;
+  text-decoration:none;
+  border-radius:16px;
+  padding:16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: transform .12s ease, border-color .12s ease, background-color .12s ease;
+}
+
+.ika-scope-flightdeck .ika-dm-card:hover{
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.055);
+}
+
+.ika-scope-flightdeck .ika-dm-card-label{
+  font-size:.8rem;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  opacity:.8;
+  margin-bottom:8px;
+}
+
+.ika-scope-flightdeck .ika-dm-card-title{
+  font-size:1.05rem;
+  font-weight:700;
+  margin-bottom:6px;
+}
+
+.ika-scope-flightdeck .ika-dm-card-description{
+  margin:0 0 14px 0;
+  opacity:.9;
+  line-height:1.45;
+}
+
+.ika-scope-flightdeck .ika-dm-card-footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+
+.ika-scope-flightdeck .ika-dm-card-reward,
+.ika-scope-flightdeck .ika-dm-card-state{
+  font-size:.85rem;
+  opacity:.9;
+  white-space:nowrap;
+}
+
+@media (max-width: 920px){
+  .ika-scope-flightdeck .ika-dm-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-dm-grid{ grid-template-columns:1fr; }
+}
+
+/*
+ * MERGE NOTE: Badges Preview rules appended to restore dashboard badges styling.
+ * Source: ika_flightdeck.BADGES_CLASSES_PATCH.css
+ */
+/* =========================================================
+   Flight Deck – Badges preview (Dashboard)
+   Matches markup from [ika_fd_badges_preview]
+========================================================= */
+.ika-scope-flightdeck .ika-fd-badges-preview{
+  margin-top: 6px;
+}
+
+.ika-scope-flightdeck .ika-fd-badges-empty{
+  margin-top: 12px;
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.ika-scope-flightdeck .ika-fd-badges-empty__title{
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: #ffffff;
+}
+
+.ika-scope-flightdeck .ika-fd-badges-empty__meta{
+  margin: 0 0 10px;
+  opacity: .9;
+  line-height: 1.45;
+  color: #c7d6f6;
+}
+
+/* Grid of badge cards */
+.ika-scope-flightdeck .ika-fd-badges-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ika-scope-flightdeck a.ika-fd-badge-card{
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  text-decoration: none;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.ika-scope-flightdeck a.ika-fd-badge-card:hover{
+  transform: translateY(-1px);
+  border-color: rgba(98,169,242,0.30);
+  background: rgba(98,169,242,0.08);
+}
+
+.ika-scope-flightdeck .ika-fd-badge-icon{
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.10);
+  grid-row: 1 / span 2;
+}
+
+/* Text */
+.ika-scope-flightdeck .ika-fd-badge-title{
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.ika-scope-flightdeck .ika-fd-badge-meta{
+  font-size: .86rem;
+  opacity: .9;
+  color: #bcd0f7;
+  line-height: 1.25;
+}
+
+/* Responsive */
+@media (max-width: 900px){
+  .ika-scope-flightdeck .ika-fd-badges-grid{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-fd-badges-grid{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   Flight Deck – Phase A2: Rank & XP + Account standardization
+   Safe, additive tweaks (no rewrites)
+========================================================= */
+
+.ika-scope-flightdeck .ika-hub-rankxp .ika-xp-progress-wrapper{
+  margin-top:14px;
+}
+
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-labels{
+  display:flex;
+  gap:14px;
+  justify-content:space-between;
+  margin-top:10px;
+  padding-bottom:4px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none; /* Firefox */
+}
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-labels::-webkit-scrollbar{display:none;}
+
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-labels span{
+  white-space:nowrap;
+  font-size:12px;
+  letter-spacing:.02em;
+  opacity:.85;
+}
+
+/* On very small screens, make labels a bit tighter */
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-labels{
+    gap:10px;
+  }
+  .ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-labels span{
+    font-size:11px;
+  }
+}
+
+/* Account section: remove inline-style dependencies */
+.ika-scope-flightdeck .ika-hub-account .ika-hub-card-title{
+  font-weight:700;
+  font-size:1rem;
+  line-height:1.2;
+  margin:0 0 8px 0;
+}
+
+.ika-scope-flightdeck .ika-hub-account .ika-hub-account-actions{
+  margin-top:10px;
+}
+
+
+/* =========================================================
+   Phase A3 – Flight Deck polish
+   - Rank & XP: normalize spacing + ladder label row
+   - Account & Preferences: card title + action spacing
+========================================================= */
+
+/* Ensure legacy section header class still looks correct if present */
+.ika-scope-flightdeck .ika-hub-section-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:12px;
+}
+
+/* Rank & XP module */
+.ika-scope-flightdeck .ika-hub-section.ika-hub-rankxp{
+  padding-bottom: 6px; /* match other shortcode-led sections */
+}
+
+.ika-scope-flightdeck .ika-hub-rank-xp{
+  margin-top: 12px;
+}
+
+.ika-scope-flightdeck .ika-hub-rank-card .ika-hub-rank-label,
+.ika-scope-flightdeck .ika-hub-xp-card .ika-hub-rank-label{
+  letter-spacing: .02em;
+}
+
+.ika-scope-flightdeck .ika-hub-rank-ladder{
+  margin-top: 12px;
+}
+
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels{
+  display:flex;
+  gap: 10px;
+  overflow-x:auto;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  scrollbar-width: thin;
+}
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels::-webkit-scrollbar{ height: 8px; }
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,0.14);
+  border-radius: 999px;
+}
+
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels span{
+  white-space: nowrap;
+  font-size: .85rem;
+  opacity: .85;
+}
+
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels span.is-current,
+.ika-scope-flightdeck .ika-hub-rank-ladder-labels span[aria-current="true"]{
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* XP progress wrapper spacing (remove need for inline margins) */
+.ika-scope-flightdeck .ika-xp-progress-wrapper{
+  margin-top: 14px;
+}
+
+/* Account & Preferences module */
+.ika-scope-flightdeck .ika-hub-section.ika-hub-account .ika-hub-account-grid{
+  margin-top: 12px;
+}
+
+.ika-scope-flightdeck .ika-fd-card-title{
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+
+.ika-scope-flightdeck .ika-hub-account-actions{
+  margin-top: 10px;
+}
+
+/* Preferences list: a touch more air */
+.ika-scope-flightdeck .ika-hub-pref-item{
+  line-height: 1.35;
+  gap: 10px;
+}
+.ika-scope-flightdeck .ika-hub-pref-item + .ika-hub-pref-item{
+  margin-top: 8px;
+}
+
+@media (max-width: 700px){
+  .ika-scope-flightdeck .ika-hub-rank-ladder-labels{
+    padding: 10px 6px;
+  }
+}
+
+/* =========================================================
+   Flight Deck – Phase A3: Rank & XP card text spacing polish
+   (Full overwrite-safe; additive overrides)
+========================================================= */
+
+/* Tighten label→title rhythm inside the Rank & XP cards */
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-label{
+  display:block;
+  margin:0 0 6px 0;
+  line-height:1.1;
+}
+
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-name{
+  margin-top:0 !important; /* overrides any inline margin-top */
+  margin-bottom:10px;
+  line-height:1.15;
+}
+
+/* If rank-name is a DIV (Current Rank card), give it consistent spacing */
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-card .ika-hub-rank-name{
+  padding-top:2px;
+  margin-bottom:10px;
+}
+
+/* If rank-name is an H3 (XP card), keep it a touch tighter */
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-xp-card h3.ika-hub-rank-name{
+  margin-bottom:12px;
+}
+
+/* Ensure progress block doesn’t feel glued to the title */
+.ika-scope-flightdeck .ika-hub-rankxp .ika-hub-xp-card .ika-xp-progress-wrapper{
+  margin-top:10px;
+}
+
+/* Small screens: a bit more breathing room */
+@media (max-width: 560px){
+  .ika-scope-flightdeck .ika-hub-rankxp .ika-hub-rank-name{
+    margin-bottom:12px;
+  }
+}
