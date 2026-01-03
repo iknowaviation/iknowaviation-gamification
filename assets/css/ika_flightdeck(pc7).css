@@ -2757,67 +2757,58 @@
 }
 
 
+/* =========================================================
+   LEADERBOARD + TABLE AVATARS (24px) — restore PRE behavior
+   Fixes: oversized wrapper (default 110px), misaligned Lv badge
+========================================================= */
 
-/* ======================================================================
-   PATCH: Leaderboard avatar + LV badge (restore PRE behavior)
-   - Ensures the 24px avatar image is visible
-   - Keeps the LV badge small and anchored to the avatar corner
-   ====================================================================== */
-
-.ika-scope-flightdeck .ika-hub-leaderboard-table .ika-level-avatar-wrapper,
-.ika-scope-flightdeck .ika-hub-leaderboard-table .ika-leaderboard .ika-level-avatar-wrapper,
-.ika-scope-flightdeck .ika-fd-leaderboard .ika-level-avatar-wrapper{
-  position: relative;
+/* Scope to leaderboard + any table that uses the small avatar */
+.ika-hub-leaderboard-table .ika-level-avatar-wrapper,
+.ika-hub-flightlog-table .ika-level-avatar-wrapper,
+.ika-leaderboard .ika-level-avatar-wrapper {
+  --ika-avatar-size: 24px;
+  width: var(--ika-avatar-size);
+  height: var(--ika-avatar-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border-radius: 999px;
-  overflow: visible;
   vertical-align: middle;
-}
-
-.ika-scope-flightdeck .ika-hub-leaderboard-table .ika-level-avatar-wrapper img,
-.ika-scope-flightdeck .ika-hub-leaderboard-table .ika-level-avatar,
-.ika-scope-flightdeck .ika-leaderboard .ika-level-avatar-wrapper img,
-.ika-scope-flightdeck .ika-fd-leaderboard .ika-level-avatar-wrapper img{
-  display: block !important;
-  width: 24px !important;
-  height: 24px !important;
-  max-width: 24px !important;
-  max-height: 24px !important;
-  border-radius: 999px !important;
-  object-fit: cover;
-  background: transparent;
-}
-
-.ika-scope-flightdeck .ika-hub-leaderboard-table .ika-level-avatar-wrapper .ika-level-badge,
-.ika-scope-flightdeck .ika-leaderboard .ika-level-avatar-wrapper .ika-level-badge,
-.ika-scope-flightdeck .ika-fd-leaderboard .ika-level-avatar-wrapper .ika-level-badge{
-  position: absolute !important;
-  right: -7px;
-  bottom: -7px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  font-size: 9px;
-  line-height: 1;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  box-shadow: 0 0 0 2px rgba(2, 8, 24, 0.95);
-}
-
-/* Tighten row layout so the badge never pushes text */
-.ika-scope-flightdeck .ika-hub-leaderboard-table td:nth-child(2),
-.ika-scope-flightdeck .ika-leaderboard td:nth-child(2){
-  white-space: nowrap;
-}
-.ika-scope-flightdeck .ika-hub-leaderboard-table td:nth-child(2) .ika-level-avatar-wrapper,
-.ika-scope-flightdeck .ika-leaderboard td:nth-child(2) .ika-level-avatar-wrapper{
   margin-right: 10px;
+  box-shadow: 0 0 0 1px rgba(255, 211, 115, 0.55);
+}
+
+/* Ensure the avatar image actually fits the 24px wrapper */
+.ika-hub-leaderboard-table .ika-level-avatar-wrapper img,
+.ika-hub-flightlog-table .ika-level-avatar-wrapper img,
+.ika-leaderboard .ika-level-avatar-wrapper img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  border-radius: 999px;
+  display: block;
+}
+
+/* Small, tidy Lv badge for table avatars */
+.ika-hub-leaderboard-table .ika-level-badge,
+.ika-hub-flightlog-table .ika-level-badge,
+.ika-leaderboard .ika-level-badge {
+  right: -4px;
+  bottom: -4px;
+  transform: none;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  letter-spacing: 0.02em;
+}
+
+/* Slightly reduce badge weight in dense tables */
+.ika-hub-leaderboard-table .ika-level-badge,
+.ika-hub-flightlog-table .ika-level-badge {
+  font-weight: 700;
+}
+
+/* Prevent table rows from stretching due to wrapper defaults */
+.ika-hub-leaderboard-table td .ika-level-avatar-wrapper,
+.ika-hub-flightlog-table td .ika-level-avatar-wrapper {
+  flex: 0 0 auto;
 }
