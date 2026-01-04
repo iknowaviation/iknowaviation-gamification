@@ -165,7 +165,17 @@ add_action( 'wp_enqueue_scripts', function () {
         );
     
 
-        // Flight Deck sub-page add-ons (only load when page matches)
+        
+        // Flight Deck JS (leaderboard tabs)
+        $fd_js_rel = '/assets/js/ika_flightdeck_leaderboard_tabs.js';
+        wp_enqueue_script(
+            'ika-flightdeck-tabs',
+            IKA_GAM_PLUGIN_URL . $fd_js_rel,
+            array(),
+            ika_gam_asset_ver( $fd_js_rel ),
+            true
+        );
+// Flight Deck sub-page add-ons (only load when page matches)
         // Pages: /flight-deck/missions/ and /flight-deck/badges/
         if ( ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ) {
             $rel = '/assets/css/ika_flightdeck_missions.css';

@@ -37,7 +37,9 @@ function ika_rebuild_stats_for_user( $user_id ) {
 		update_user_meta( $user_id, 'ika_score_sum', 0 );
 		update_user_meta( $user_id, 'ika_avg_score', 0 );
 		update_user_meta( $user_id, 'ika_best_score', 0 );
-		update_user_meta( $user_id, 'ika_total_xp', 0 );
+		update_user_meta( $user_id, 'ika_total_xp_quiz', 0 );
+	// Do not reset ika_total_xp_bonus here.
+	update_user_meta( $user_id, 'ika_total_xp', 0 );
 		update_user_meta( $user_id, 'ika_current_streak_days', 0 );
 		update_user_meta( $user_id, 'ika_last_quiz_date', '' );
 		update_user_meta( $user_id, 'ika_last_quiz_timestamp', 0 );
@@ -45,7 +47,7 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	}
 
 	$total_attempts  = count( $rows );
-	$best_by_exam    = array();
+	$unique_quiz_ids = array();
 	$score_sum       = 0.0;
 	$best_score      = 0.0;
 	$total_points    = 0;
@@ -54,13 +56,9 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	$last_quiz_date  = '';
 
 	foreach ( $rows as $row ) {
-		$eid = (int) $row->exam_id;
-		$score = isset( $row->percent_correct ) ? (float) $row->percent_correct : 0.0;
-		if ( ! isset( $best_by_exam[ $eid ] ) || $score > $best_by_exam[ $eid ] ) {
-			$best_by_exam[ $eid ] = $score;
-		}
+		$unique_quiz_ids[ $row->exam_id ] = true;
 
-		// $score already computed above for completion logic.
+		$score = isset( $row->percent_correct ) ? (float) $row->percent_correct : 0.0;
 		if ( $score > 0 ) {
 			$score_sum += $score;
 			if ( $score > $best_score ) {
@@ -83,10 +81,7 @@ function ika_rebuild_stats_for_user( $user_id ) {
 		}
 	}
 
-	$quizzes_completed = 0;
-	foreach ( (array) $best_by_exam as $best_pct ) {
-		if ( (float) $best_pct >= 70.0 ) { $quizzes_completed++; }
-	}
+	$quizzes_completed = count( $unique_quiz_ids );
 	$avg_score         = $total_attempts > 0 ? ( $score_sum / $total_attempts ) : 0.0;
 	$streak_days       = ika_compute_streak_from_dates( $dates );
 
@@ -95,7 +90,12 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	update_user_meta( $user_id, 'ika_score_sum', $score_sum );
 	update_user_meta( $user_id, 'ika_avg_score', $avg_score );
 	update_user_meta( $user_id, 'ika_best_score', $best_score );
-	update_user_meta( $user_id, 'ika_total_xp', $total_points );
+	update_user_meta( $user_id, 'ika_total_xp_quiz', $total_points );
+
+	// Preserve bonus XP (missions, promos, etc.)
+	$bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+	$bonus_xp = max( 0, $bonus_xp );
+	update_user_meta( $user_id, 'ika_total_xp', (int) $total_points + $bonus_xp );
 	update_user_meta( $user_id, 'ika_current_streak_days', $streak_days );
 	update_user_meta( $user_id, 'ika_last_quiz_date', $last_quiz_date );
 	update_user_meta( $user_id, 'ika_last_quiz_timestamp', $last_quiz_ts );

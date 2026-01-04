@@ -5,6 +5,10 @@
  * Displays total XP earned by the current user over the last N days.
  * Default: last 7 days
  *
+ * Includes:
+ *  - Quiz XP (WatuPRO points from finished attempts)
+ *  - Bonus XP (mission bonuses) if XP Bonus Ledger is present
+ *
  * Usage:
  *  [ika_recent_xp_earned]
  *  [ika_recent_xp_earned days="1"]
@@ -85,12 +89,10 @@ add_shortcode( 'ika_recent_xp_earned', function ( $atts ) {
 
 	$where_finished = '';
 	if ( $finished_col ) {
-		// Most installs use 1/0.
 		$where_finished = " AND {$finished_col} = 1 ";
 	}
 
-	// Query using MySQL time (covers PHP/DB timezone drift).
-	// We try NOW() and UTC_TIMESTAMP() and take the larger result to handle storage differences.
+	// Quiz XP via WatuPRO points.
 	$sql_now = $wpdb->prepare(
 		"
 		SELECT COALESCE(SUM({$points_col}), 0)
@@ -115,26 +117,36 @@ add_shortcode( 'ika_recent_xp_earned', function ( $atts ) {
 		$days
 	);
 
-	$total_now = (int) $wpdb->get_var( $sql_now );
-	$total_utc = (int) $wpdb->get_var( $sql_utc );
+	$quiz_now = (int) $wpdb->get_var( $sql_now );
+	$quiz_utc = (int) $wpdb->get_var( $sql_utc );
 
-	$total_xp = max( $total_now, $total_utc );
+	$quiz_xp = max( $quiz_now, $quiz_utc );
+
+	// Bonus XP (missions) via ledger if available.
+	$bonus_xp = 0;
+	if ( function_exists( 'ika_xp_bonus_sum_since_days' ) ) {
+		$bonus_xp = (int) ika_xp_bonus_sum_since_days( (int) $user_id, (int) $days );
+	}
+
+	$total = (int) $quiz_xp + (int) $bonus_xp;
 
 	if ( $debug ) {
 		return sprintf(
-			'DEBUG: days=%d date_col=%s points_col=%s finished_col=%s total_now=%d total_utc=%d',
+			'DEBUG: days=%d date_col=%s points_col=%s finished_col=%s quiz_now=%d quiz_utc=%d bonus=%d total=%d',
 			$days,
 			$date_col,
 			$points_col,
 			$finished_col ?: 'NONE',
-			$total_now,
-			$total_utc
+			$quiz_now,
+			$quiz_utc,
+			$bonus_xp,
+			$total
 		);
 	}
 
-	if ( $total_xp <= 0 ) {
+	if ( $total <= 0 ) {
 		return '0 XP';
 	}
 
-	return '+' . number_format_i18n( $total_xp ) . ' XP';
+	return '+' . number_format_i18n( $total ) . ' XP';
 } );

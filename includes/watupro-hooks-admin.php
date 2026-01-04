@@ -23,7 +23,7 @@ function ika_on_watupro_completed_exam( $taking_id ) {
 
 	$taking = $wpdb->get_row(
 		$wpdb->prepare(
-			"SELECT user_id FROM {$table} WHERE ID = %d",
+			"SELECT user_id, percent_correct FROM {$table} WHERE ID = %d",
 			$taking_id
 		)
 	);
@@ -32,5 +32,10 @@ function ika_on_watupro_completed_exam( $taking_id ) {
 		return;
 	}
 
-	ika_rebuild_stats_for_user( (int) $taking->user_id );
-}
+	// Update daily missions based on this completion (awards bonus XP once per mission/day).
+	if ( function_exists( 'ika_dm_update_on_completion' ) ) {
+		$percent = isset( $taking->percent_correct ) ? floatval( $taking->percent_correct ) : 0;
+		ika_dm_update_on_completion( (int) $taking->user_id, $percent );
+	}
+
+	ika_rebuild_stats_for_user( (int) $taking->user_id );}

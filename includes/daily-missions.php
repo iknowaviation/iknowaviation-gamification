@@ -110,10 +110,30 @@ function ika_dm_save_state( $user_id, $state ) {
 /**
  * Add XP to the user (separate from Watu Play internal points).
  */
-function ika_dm_add_xp( $user_id, $xp ) {
-    $current = (int) get_user_meta( $user_id, 'ika_xp_total', true );
-    $new     = max( 0, $current + (int) $xp );
-    update_user_meta( $user_id, 'ika_xp_total', $new );
+function ika_dm_add_xp( $user_id, $xp, $reason = "" ) {
+    $xp = (int) $xp;
+    if ( $xp <= 0 ) {
+        return;
+    }
+
+    // Bonus XP from missions should NOT be overwritten by stats rebuilds.
+    // We store it separately and then keep ika_total_xp in sync.
+    $bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+    $bonus = max( 0, $bonus + $xp );
+    update_user_meta( $user_id, 'ika_total_xp_bonus', $bonus );
+	// Record bonus award in ledger (if available)
+	if ( function_exists( 'ika_xp_bonus_add' ) ) {
+		ika_xp_bonus_add( (int) $user_id, (int) $xp, (string) $reason );
+	}
+// Keep legacy key for backward compatibility (safe no-op for new installs).
+    $legacy = (int) get_user_meta( $user_id, 'ika_xp_total', true );
+    $legacy = max( 0, $legacy + $xp );
+    update_user_meta( $user_id, 'ika_xp_total', $legacy );
+
+    // Sync the displayed total XP = quiz XP + bonus XP.
+    $quiz_xp  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
+    $total_xp = max( 0, $quiz_xp + $bonus );
+    update_user_meta( $user_id, 'ika_total_xp', $total_xp );
 }
 
 /**
@@ -194,7 +214,7 @@ function ika_dm_update_on_completion( $user_id, $percentage ) {
                     $mstate['progress']  = (int) $mission['target'];
                     $mstate['completed'] = true;
                     if ( ! empty( $mission['xp_reward'] ) ) {
-                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'] );
+                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id );
                     }
                 }
                 $changed = true;
@@ -206,7 +226,7 @@ function ika_dm_update_on_completion( $user_id, $percentage ) {
                     $mstate['progress']  = (int) $mission['target'];
                     $mstate['completed'] = true;
                     if ( ! empty( $mission['xp_reward'] ) ) {
-                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'] );
+                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id );
                     }
                     $changed = true;
                 }
@@ -563,4 +583,218 @@ function ika_dm_test_shortcode() {
 }
 add_shortcode( 'ika_dm_test', 'ika_dm_test_shortcode' );
 
+/* =========================================================
+   XP Bonus Ledger (Missions) — supports:
+   - Including mission bonus in "XP This Week" pill
+   - Resetting today's mission bonuses for testing
+   Stored in user meta: ika_total_xp_bonus + ika_xp_bonus_ledger (array)
+========================================================= */
 
+if ( ! function_exists( 'ika_xp_bonus_get_ledger' ) ) {
+	function ika_xp_bonus_get_ledger( int $user_id ): array {
+		$ledger = get_user_meta( $user_id, 'ika_xp_bonus_ledger', true );
+		return is_array( $ledger ) ? $ledger : [];
+	}
+}
+
+if ( ! function_exists( 'ika_xp_bonus_set_ledger' ) ) {
+	function ika_xp_bonus_set_ledger( int $user_id, array $ledger ): void {
+		update_user_meta( $user_id, 'ika_xp_bonus_ledger', array_values( $ledger ) );
+	}
+}
+
+if ( ! function_exists( 'ika_xp_bonus_add' ) ) {
+	function ika_xp_bonus_add( int $user_id, int $amount, string $reason = '' ): void {
+		if ( $amount === 0 ) return;
+
+		$amount = (int) $amount;
+		$ledger = ika_xp_bonus_get_ledger( $user_id );
+
+		$ledger[] = [
+			'ts'     => time(),
+			'date'   => wp_date( 'Y-m-d' ),
+			'amount' => $amount,
+			'reason' => sanitize_text_field( $reason ),
+		];
+
+		ika_xp_bonus_set_ledger( $user_id, $ledger );
+	}
+}
+
+if ( ! function_exists( 'ika_xp_bonus_sum_since_days' ) ) {
+	function ika_xp_bonus_sum_since_days( int $user_id, int $days ): int {
+		$days = max( 1, (int) $days );
+		$cutoff = time() - ( DAY_IN_SECONDS * $days );
+
+		$sum = 0;
+		foreach ( ika_xp_bonus_get_ledger( $user_id ) as $row ) {
+			$ts = isset( $row['ts'] ) ? (int) $row['ts'] : 0;
+			if ( $ts >= $cutoff ) {
+				$sum += (int) ( $row['amount'] ?? 0 );
+			}
+		}
+		return (int) $sum;
+	}
+}
+
+if ( ! function_exists( 'ika_xp_bonus_remove_by_date' ) ) {
+	function ika_xp_bonus_remove_by_date( int $user_id, string $ymd ): int {
+		$removed = 0;
+		$ledger = ika_xp_bonus_get_ledger( $user_id );
+
+		$new = [];
+		foreach ( $ledger as $row ) {
+			$date = (string) ( $row['date'] ?? '' );
+			if ( $date === $ymd ) {
+				$removed += (int) ( $row['amount'] ?? 0 );
+				continue;
+			}
+			$new[] = $row;
+		}
+
+		ika_xp_bonus_set_ledger( $user_id, $new );
+		return (int) $removed;
+	}
+}
+
+/**
+ * Recompute ika_total_xp (quiz + bonus) from stored components.
+ * - quiz component should live in ika_total_xp_quiz
+ * - bonus component in ika_total_xp_bonus
+ */
+if ( ! function_exists( 'ika_xp_recompute_total' ) ) {
+	function ika_xp_recompute_total( int $user_id ): int {
+		$quiz  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
+		$bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+		$total = max( 0, $quiz + $bonus );
+
+		update_user_meta( $user_id, 'ika_total_xp', $total );
+
+		// Back-compat key (legacy).
+		update_user_meta( $user_id, 'ika_xp_total', $total );
+
+		return $total;
+	}
+}
+
+/**
+ * ADMIN-ONLY: Reset today's mission completion + today's mission bonus awards for the current user.
+ * Usage: [ika_dm_reset_today]
+ */
+add_shortcode( 'ika_dm_reset_today', function () {
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return '';
+	}
+	if ( ! is_user_logged_in() ) {
+		return 'Not logged in.';
+	}
+
+	$user_id = get_current_user_id();
+	$today   = wp_date( 'Y-m-d' );
+
+	// Hard reset: daily missions state for today.
+	$state = array(
+		'date'     => $today,
+		'missions' => array(),
+	);
+
+	if ( function_exists( 'ika_dm_save_state' ) ) {
+		ika_dm_save_state( $user_id, $state );
+	} else {
+		update_user_meta( $user_id, 'ika_daily_missions_state', $state );
+	}
+
+	// Remove today's bonus ledger entries and decrement bonus meta accordingly.
+	$removed = 0;
+	if ( function_exists( 'ika_xp_bonus_remove_by_date' ) ) {
+		$removed = ika_xp_bonus_remove_by_date( $user_id, $today );
+	}
+
+	if ( $removed > 0 ) {
+		$bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+		$bonus = max( 0, $bonus - $removed );
+		update_user_meta( $user_id, 'ika_total_xp_bonus', $bonus );
+	}
+
+	$total = function_exists( 'ika_xp_recompute_total' ) ? ika_xp_recompute_total( $user_id ) : (int) get_user_meta( $user_id, 'ika_total_xp', true );
+
+	return 'Reset OK. Removed bonus=' . (int) $removed . ' XP. Total XP now=' . (int) $total . '.';
+} );
+
+/**
+ * ADMIN-ONLY: Debug XP breakdown for current user.
+ * Usage: [ika_debug_xp_breakdown days="7"]
+ */
+add_shortcode( 'ika_debug_xp_breakdown', function ( $atts ) {
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return '';
+	}
+	if ( ! is_user_logged_in() ) {
+		return 'Not logged in.';
+	}
+
+	$atts = shortcode_atts( [ 'days' => 7 ], $atts, 'ika_debug_xp_breakdown' );
+	$days = max( 1, (int) $atts['days'] );
+
+	$user_id = get_current_user_id();
+
+	$quiz  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
+	$bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+	$total = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+
+	$bonus_recent = ika_xp_bonus_sum_since_days( $user_id, $days );
+
+	// WatuPRO recent quiz XP (best-effort using same adaptive query approach as ika_recent_xp_earned).
+	global $wpdb;
+	$table = $wpdb->prefix . 'watupro_taken_exams';
+	$quiz_recent = 0;
+
+	$found = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) );
+	if ( $found === $table ) {
+		$cols = $wpdb->get_col( "SHOW COLUMNS FROM {$table}", 0 );
+		$cols_lc = array_map( 'strtolower', $cols );
+
+		$date_col = null;
+		foreach ( [ 'date_taken', 'date', 'date_started', 'date_end', 'end_time' ] as $cand ) {
+			if ( in_array( $cand, $cols_lc, true ) ) { $date_col = $cand; break; }
+		}
+		$points_col = null;
+		foreach ( [ 'points', 'earned_points', 'result_points', 'wp_points' ] as $cand ) {
+			if ( in_array( $cand, $cols_lc, true ) ) { $points_col = $cand; break; }
+		}
+		$finished_col = null;
+		foreach ( [ 'is_finished', 'finished', 'is_complete', 'completed' ] as $cand ) {
+			if ( in_array( $cand, $cols_lc, true ) ) { $finished_col = $cand; break; }
+		}
+
+		if ( $date_col && $points_col ) {
+			$where_finished = $finished_col ? " AND {$finished_col} = 1 " : '';
+			$sql = $wpdb->prepare(
+				"
+				SELECT COALESCE(SUM({$points_col}), 0)
+				FROM {$table}
+				WHERE user_id = %d
+				  {$where_finished}
+				  AND {$date_col} >= DATE_SUB(NOW(), INTERVAL %d DAY)
+				",
+				$user_id,
+				$days
+			);
+			$quiz_recent = (int) $wpdb->get_var( $sql );
+		}
+	}
+
+	$out  = '<pre style="white-space:pre-wrap">';
+	$out .= 'XP Breakdown (user_id=' . (int) $user_id . ")\n";
+	$out .= "TOTAL: {$total}\n";
+	$out .= "QUIZ META (ika_total_xp_quiz): {$quiz}\n";
+	$out .= "BONUS META (ika_total_xp_bonus): {$bonus}\n";
+	$out .= "RECENT {$days}d QUIZ XP (WatuPRO sum): {$quiz_recent}\n";
+	$out .= "RECENT {$days}d BONUS XP (ledger): {$bonus_recent}\n";
+	$out .= 'RECENT ' . $days . 'd COMBINED: ' . (int) ( $quiz_recent + $bonus_recent ) . "\n";
+	$out .= '</pre>';
+
+	return $out;
+} );
