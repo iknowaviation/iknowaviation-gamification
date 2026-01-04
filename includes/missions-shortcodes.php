@@ -35,29 +35,58 @@ add_shortcode( 'ika_fd_missions_preview', function( $atts ) {
     $missions_url = home_url( '/flight-deck/missions/' );
 
     // Phase 1 placeholders (will be replaced by real mission engine + recommendation tags).
-    $items = [
-        [
-            'label' => 'Today\'s Mission',
-            'title' => 'Complete 2 quizzes',
-            'desc'  => 'Knock out a quick set to keep your streak alive.',
-            'reward'=> '+50 XP',
-            'state' => 'Not started',
-        ],
-        [
-            'label' => 'Weekly Mission',
-            'title' => 'Try a new topic',
-            'desc'  => 'Explore a different quiz group this week.',
-            'reward'=> '+150 XP',
-            'state' => 'In progress',
-        ],
-        [
-            'label' => 'Special Mission',
-            'title' => 'Perfect score run',
-            'desc'  => 'Earn a perfect score on any quiz.',
-            'reward'=> '+Badge',
-            'state' => 'Optional',
-        ],
-    ];
+    $user_id = get_current_user_id();
+
+    // Use the Daily Missions module (real mission config + per-user state).
+    $config = function_exists( 'ika_dm_get_missions_config' ) ? ika_dm_get_missions_config() : [];
+    $state  = function_exists( 'ika_dm_get_state' ) ? ika_dm_get_state( $user_id ) : [ 'missions' => [] ];
+
+    $items = [];
+
+    foreach ( (array) $config as $mid => $mdef ) {
+        $label = isset( $mdef['label'] ) ? (string) $mdef['label'] : 'Mission';
+        $desc  = isset( $mdef['description'] ) ? (string) $mdef['description'] : '';
+        $target = isset( $mdef['target'] ) ? (int) $mdef['target'] : 1;
+        $reward = isset( $mdef['xp_reward'] ) ? (int) $mdef['xp_reward'] : 0;
+
+        $progress = 0;
+        $completed = false;
+
+        if ( isset( $state['missions'][ $mid ] ) ) {
+            $progress  = isset( $state['missions'][ $mid ]['progress'] ) ? (int) $state['missions'][ $mid ]['progress'] : 0;
+            $completed = ! empty( $state['missions'][ $mid ]['completed'] );
+        }
+
+        $state_label = $completed ? 'Completed' : ( $progress > 0 ? 'In progress' : 'Not started' );
+        $reward_label = $reward ? sprintf( '+%d XP', $reward ) : '';
+
+        $items[] = [
+            'label'  => 'Daily Mission',
+            'title'  => $label,
+            'desc'   => $desc,
+            'reward' => $reward_label,
+            'state'  => $state_label,
+            'progress' => $progress,
+            'target' => $target,
+            'completed' => $completed,
+        ];
+    }
+
+    // Conservative fallback (should rarely happen).
+    if ( empty( $items ) ) {
+        $items = [
+            [
+                'label' => 'Daily Mission',
+                'title' => 'Complete a quiz',
+                'desc'  => 'Finish any quiz today to keep your momentum.',
+                'reward'=> '+5 XP',
+                'state' => 'Not started',
+                'progress' => 0,
+                'target' => 1,
+                'completed' => false,
+            ],
+        ];
+    }
 
     $items = array_slice( $items, 0, $limit );
 

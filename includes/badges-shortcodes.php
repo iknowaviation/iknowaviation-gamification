@@ -52,14 +52,45 @@ add_shortcode( 'ika_fd_badges_preview', function( $atts ) {
         <?php else : ?>
             <?php
             // Phase 1 placeholders: we’ll replace with Watu Play earned/locked badges later.
-            $items = [
-                [ 'title' => 'First Badge',        'meta' => 'Earned' ],
-                [ 'title' => 'Smooth Landing',     'meta' => 'Earned' ],
-                [ 'title' => 'Radio Ready',        'meta' => 'Earned' ],
-                [ 'title' => 'Runway Pro',         'meta' => 'Locked' ],
-                [ 'title' => 'Weather Wise',       'meta' => 'Locked' ],
-                [ 'title' => 'Instrument Rated',   'meta' => 'Locked' ],
-            ];
+            $user_id = get_current_user_id();
+            $xp = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+
+            $ladder = function_exists( 'ika_get_rank_ladder' ) ? ika_get_rank_ladder() : [];
+            // Ensure ascending by min_xp.
+            usort( $ladder, function( $a, $b ) {
+                return (int) ($a['min_xp'] ?? 0) <=> (int) ($b['min_xp'] ?? 0);
+            });
+
+            $earned = [];
+            $locked = [];
+
+            foreach ( (array) $ladder as $r ) {
+                $label = isset( $r['label'] ) ? (string) $r['label'] : '';
+                $min_xp = isset( $r['min_xp'] ) ? (int) $r['min_xp'] : 0;
+                if ( $label === '' ) continue;
+
+                if ( $xp >= $min_xp ) {
+                    $earned[] = [ 'title' => $label, 'meta' => 'Earned' ];
+                } else {
+                    $locked[] = [ 'title' => $label, 'meta' => 'Locked' ];
+                }
+            }
+
+            // Show a balanced slice: recent earned first, then upcoming locked.
+            $items = [];
+
+            $earned_slice = array_slice( array_reverse( $earned ), 0, (int) ceil( $limit / 2 ) );
+            foreach ( $earned_slice as $e ) $items[] = $e;
+
+            foreach ( $locked as $l ) {
+                if ( count( $items ) >= $limit ) break;
+                $items[] = $l;
+            }
+
+            // If user has no earned ranks yet, just show the first few locked.
+            if ( empty( $items ) ) {
+                $items = array_slice( $locked, 0, $limit );
+            }
             $items = array_slice( $items, 0, $limit );
             ?>
             <div class="ika-fd-badges-grid">

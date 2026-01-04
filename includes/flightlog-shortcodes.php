@@ -60,41 +60,74 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
                 [ 'label' => 'Highest recent score',    'value' => '100%' ],
             ];
 
-            $rows = [
-                [
-                    'quiz'     => 'Airport Codes 101',
-                    'url'      => '#',
-                    'score'    => '92%',
-                    'attempts' => '3',
-                    'xp'       => '+22',
-                    'status'   => 'Completed',
-                    'status_class' => 'is-complete',
-                    'action'   => 'Review',
-                    'action_url' => '#',
-                ],
-                [
-                    'quiz'     => 'Runway Signs',
-                    'url'      => '#',
-                    'score'    => '78%',
-                    'attempts' => '1',
-                    'xp'       => '+15',
-                    'status'   => 'Completed',
-                    'status_class' => 'is-complete',
-                    'action'   => 'Retake',
-                    'action_url' => $quizzes_url,
-                ],
-                [
-                    'quiz'     => 'Weather Basics',
-                    'url'      => '#',
-                    'score'    => '65%',
-                    'attempts' => '2',
-                    'xp'       => '+10',
-                    'status'   => 'In progress',
-                    'status_class' => 'is-progress',
-                    'action'   => 'Continue',
-                    'action_url' => $quizzes_url,
-                ],
-            ];
+            $user_id = get_current_user_id();
+
+            global $wpdb;
+            $takings_tbl = function_exists( 'ika_fd_taken_table' ) ? ika_fd_taken_table() : $wpdb->prefix . 'watupro_taken_exams';
+
+            // Pull recent finished attempts.
+            $attempts = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT exam_id, percent_correct, points, end_time
+                     FROM {$takings_tbl}
+                     WHERE user_id = %d
+                       AND (in_progress IS NULL OR in_progress = 0)
+                       AND (ignore_attempt IS NULL OR ignore_attempt = 0)
+                     ORDER BY COALESCE(end_time,'') DESC, ID DESC
+                     LIMIT %d",
+                    $user_id,
+                    max( 1, min( 25, $limit * 5 ) )
+                )
+            );
+
+            $rows = [];
+
+            if ( ! empty( $attempts ) ) {
+                // Count attempts per exam_id for the subset we're showing.
+                $exam_ids = array_values( array_unique( array_map( fn($r)=> (int) $r->exam_id, $attempts ) ) );
+                $counts = [];
+
+                if ( ! empty( $exam_ids ) ) {
+                    $in = implode( ',', array_map( 'intval', $exam_ids ) );
+                    $count_rows = $wpdb->get_results(
+                        "SELECT exam_id, COUNT(*) AS c
+                         FROM {$takings_tbl}
+                         WHERE user_id = " . intval( $user_id ) . "
+                           AND exam_id IN ({$in})
+                           AND (in_progress IS NULL OR in_progress = 0)
+                           AND (ignore_attempt IS NULL OR ignore_attempt = 0)
+                         GROUP BY exam_id"
+                    );
+                    foreach ( (array) $count_rows as $cr ) {
+                        $counts[ (int) $cr->exam_id ] = (int) $cr->c;
+                    }
+                }
+
+                foreach ( array_slice( $attempts, 0, $limit ) as $a ) {
+                    $exam_id = (int) $a->exam_id;
+                    $pct     = isset( $a->percent_correct ) ? (float) $a->percent_correct : 0.0;
+
+                    $post_id = function_exists( 'ika_fd_get_quiz_post_id_by_exam_id' ) ? ika_fd_get_quiz_post_id_by_exam_id( $exam_id ) : 0;
+
+                    $title = $post_id ? get_the_title( $post_id ) : ( 'Quiz #' . $exam_id );
+                    $url   = $post_id ? get_permalink( $post_id ) : $logbook_url;
+
+                    $is_complete = ( $pct >= 70.0 );
+
+                    $rows[] = [
+                        'quiz'     => $title,
+                        'url'      => $url,
+                        'score'    => sprintf( '%d%%', (int) round( $pct ) ),
+                        'attempts' => (string) ( $counts[ $exam_id ] ?? 1 ),
+                        'xp'       => ( isset( $a->points ) ? ( '+' . intval( $a->points ) ) : '' ),
+                        'status'   => $is_complete ? 'Completed' : 'In Progress',
+                        'status_class' => $is_complete ? 'is-complete' : 'is-started',
+                        'action'   => $is_complete ? 'Retake' : 'Continue',
+                        'action_url' => $url,
+                        'date'     => function_exists( 'ika_fd_format_attempt_date' ) ? ika_fd_format_attempt_date( $a->end_time ) : '',
+                    ];
+                }
+            }
             $rows = array_slice( $rows, 0, $limit );
             ?>
 

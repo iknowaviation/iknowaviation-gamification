@@ -19,11 +19,16 @@ function ika_fd_get_quizzes_completed_for_user( $user_id ) {
 	$takings_tbl = $wpdb->prefix . 'watupro_taken_exams';
 
 	$sql = "
-		SELECT COUNT(DISTINCT exam_id)
-		FROM {$takings_tbl}
-		WHERE user_id = %d
-		  AND (in_progress = 0 OR in_progress IS NULL)
-		  AND (ignore_attempt IS NULL OR ignore_attempt = 0)
+		SELECT COUNT(*)
+		FROM (
+			SELECT exam_id
+			FROM {$takings_tbl}
+			WHERE user_id = %d
+			  AND (in_progress = 0 OR in_progress IS NULL)
+			  AND (ignore_attempt IS NULL OR ignore_attempt = 0)
+			GROUP BY exam_id
+			HAVING MAX(COALESCE(percent_correct,0)) >= 70
+		) t
 	";
 
 	$count = $wpdb->get_var( $wpdb->prepare( $sql, $user_id ) );

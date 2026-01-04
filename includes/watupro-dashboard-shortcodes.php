@@ -43,10 +43,13 @@ function ika_sc_quizzes_completed() {
     $takings_tbl = ika_watupro_table( 'WATUPRO_TAKEN_EXAMS', 'watupro_taken_exams' );
 
     // exam_id, user_id, in_progress are the usual columns in WatuPRO
-    $sql   = "SELECT COUNT(DISTINCT exam_id)
-              FROM {$takings_tbl}
-              WHERE user_id = %d
-                AND (in_progress = 0 OR in_progress IS NULL)";
+    $sql   = "SELECT COUNT(*)
+              FROM (SELECT exam_id
+                    FROM {$takings_tbl}
+                    WHERE user_id = %d
+                      AND (in_progress = 0 OR in_progress IS NULL)
+                    GROUP BY exam_id
+                    HAVING MAX(COALESCE(percent_correct,0)) >= 70) t";
     $count = $wpdb->get_var( $wpdb->prepare( $sql, $user_id ) );
 
     return intval( $count );

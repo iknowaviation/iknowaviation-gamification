@@ -45,7 +45,7 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	}
 
 	$total_attempts  = count( $rows );
-	$unique_quiz_ids = array();
+	$best_by_exam    = array();
 	$score_sum       = 0.0;
 	$best_score      = 0.0;
 	$total_points    = 0;
@@ -54,9 +54,13 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	$last_quiz_date  = '';
 
 	foreach ( $rows as $row ) {
-		$unique_quiz_ids[ $row->exam_id ] = true;
-
+		$eid = (int) $row->exam_id;
 		$score = isset( $row->percent_correct ) ? (float) $row->percent_correct : 0.0;
+		if ( ! isset( $best_by_exam[ $eid ] ) || $score > $best_by_exam[ $eid ] ) {
+			$best_by_exam[ $eid ] = $score;
+		}
+
+		// $score already computed above for completion logic.
 		if ( $score > 0 ) {
 			$score_sum += $score;
 			if ( $score > $best_score ) {
@@ -79,7 +83,10 @@ function ika_rebuild_stats_for_user( $user_id ) {
 		}
 	}
 
-	$quizzes_completed = count( $unique_quiz_ids );
+	$quizzes_completed = 0;
+	foreach ( (array) $best_by_exam as $best_pct ) {
+		if ( (float) $best_pct >= 70.0 ) { $quizzes_completed++; }
+	}
 	$avg_score         = $total_attempts > 0 ? ( $score_sum / $total_attempts ) : 0.0;
 	$streak_days       = ika_compute_streak_from_dates( $dates );
 

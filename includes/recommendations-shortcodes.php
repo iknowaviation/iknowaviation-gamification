@@ -60,26 +60,96 @@ add_shortcode( 'ika_recommendations_rail', function( $atts = [] ) {
      * - These will be replaced by the unified recommendation engine scoring later.
      * - Keep UX restrained: max 3 items by default.
      */
-    $items = [
-        [
-            'title' => 'Continue your mission',
-            'meta'  => 'Pick up with a quick quiz to keep your streak alive.',
-            'url'   => $quiz_hub_url,
-            'cta'   => 'Continue',
-        ],
-        [
-            'title' => 'Recommended next quiz',
-            'meta'  => 'A smart next step based on your progress (personalization coming next).',
-            'url'   => $quiz_hub_url,
-            'cta'   => 'Start',
-        ],
-        [
-            'title' => 'Quick win (2–4 minutes)',
-            'meta'  => 'A short quiz to earn XP fast and build momentum.',
-            'url'   => $quiz_hub_url,
-            'cta'   => 'Quick quiz',
-        ],
-    ];
+    // Logged-in recommendations (Phase 1 wiring):
+    // - Exclude completed quizzes (best attempt >= 70%)
+    // - Prefer the same quiz group as the user's most recent attempt
+    // - Fallback to the quiz hub if we can't resolve posts cleanly
+
+    $user_id = get_current_user_id();
+
+    $completed_exam_ids = function_exists( 'ika_fd_get_completed_exam_ids' )
+        ? ika_fd_get_completed_exam_ids( $user_id, 70 )
+        : [];
+
+    $last_exam_id = function_exists( 'ika_fd_get_last_attempt_exam_id' )
+        ? ika_fd_get_last_attempt_exam_id( $user_id )
+        : 0;
+
+    $preferred_group_ids = [];
+    if ( $last_exam_id && function_exists( 'ika_fd_get_quiz_post_id_by_exam_id' ) ) {
+        $last_post_id = ika_fd_get_quiz_post_id_by_exam_id( $last_exam_id );
+        if ( $last_post_id && function_exists( 'ika_fd_get_quiz_group_term_ids' ) ) {
+            $preferred_group_ids = ika_fd_get_quiz_group_term_ids( $last_post_id );
+        }
+    }
+
+    // Build candidate posts from the Quiz index.
+    $idx = function_exists( 'ika_fd_get_quiz_index' ) ? ika_fd_get_quiz_index() : [ 'by_exam' => [] ];
+    $candidates = [];
+
+    foreach ( (array) ( $idx['by_exam'] ?? [] ) as $exam_id => $post_id ) {
+        $exam_id = (int) $exam_id;
+        $post_id = (int) $post_id;
+
+        if ( ! $exam_id || ! $post_id ) continue;
+        if ( in_array( $exam_id, $completed_exam_ids, true ) ) continue;
+
+        $candidates[] = $post_id;
+    }
+
+    // Prefer same-group candidates if possible.
+    if ( ! empty( $preferred_group_ids ) ) {
+        $grouped = [];
+        foreach ( $candidates as $pid ) {
+            $gids = function_exists( 'ika_fd_get_quiz_group_term_ids' ) ? ika_fd_get_quiz_group_term_ids( $pid ) : [];
+            if ( array_intersect( $preferred_group_ids, $gids ) ) {
+                $grouped[] = $pid;
+            }
+        }
+        if ( ! empty( $grouped ) ) {
+            $candidates = $grouped;
+        }
+    }
+
+    // Stable sort: menu_order then title.
+    usort( $candidates, function( $a, $b ) {
+        $ao = (int) get_post_field( 'menu_order', $a );
+        $bo = (int) get_post_field( 'menu_order', $b );
+        if ( $ao !== $bo ) return $ao <=> $bo;
+        return strcmp( (string) get_the_title( $a ), (string) get_the_title( $b ) );
+    });
+
+    $items = [];
+    foreach ( array_slice( $candidates, 0, $limit ) as $pid ) {
+        $title = get_the_title( $pid );
+        $url   = get_permalink( $pid );
+
+        // Light metadata: group name if available.
+        $meta = 'Recommended next step';
+        $terms = get_the_terms( $pid, 'ika_quiz_group' );
+        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+            $meta = 'Group: ' . $terms[0]->name;
+        }
+
+        $items[] = [
+            'title' => $title ? $title : 'Recommended quiz',
+            'meta'  => $meta,
+            'url'   => $url ? $url : $quiz_hub_url,
+            'cta'   => 'Start quiz',
+        ];
+    }
+
+    // Fallback if we couldn't resolve anything.
+    if ( empty( $items ) ) {
+        $items = [
+            [
+                'title' => 'Browse quizzes',
+                'meta'  => 'Pick a quick quiz and keep your progress moving.',
+                'url'   => $quiz_hub_url,
+                'cta'   => 'Open quiz hub',
+            ],
+        ];
+    }
 
     $items = array_slice( $items, 0, $limit );
 

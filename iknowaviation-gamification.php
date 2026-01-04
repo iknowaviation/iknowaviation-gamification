@@ -51,6 +51,11 @@ ika_gam_safe_require( 'includes/watupro-hooks-admin.php' );
 ika_gam_safe_require( 'includes/watupro-dashboard-shortcodes.php' );
 
 /**
+ * Flight Deck shared helpers
+ */
+ika_gam_safe_require( 'includes/flightdeck-helpers.php' );
+
+/**
  * Streaks + user status
  */
 ika_gam_safe_require( 'includes/streaks-status.php' );
