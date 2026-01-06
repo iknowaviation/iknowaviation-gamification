@@ -2167,6 +2167,91 @@
   gap: 10px;
 }
 
+/* Recent Activity feed (quiz attempts + mission bonuses) */
+.ika-scope-flightdeck .ika-fd-flightlog-activity{
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.ika-scope-flightdeck .ika-fd-activity-list{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-item{
+  padding: 10px 10px;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.ika-scope-flightdeck .ika-fd-activity-row{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-left{
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-icon{
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  flex: 0 0 auto;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-title{
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-title a{
+  color: inherit;
+  text-decoration: none;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-title a:hover{
+  text-decoration: underline;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-meta{
+  opacity: .85;
+  font-size: .92rem;
+  line-height: 1.25;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-right{
+  text-align: right;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-xp{
+  font-weight: 800;
+}
+
+.ika-scope-flightdeck .ika-fd-activity-time{
+  opacity: .75;
+  font-size: .85rem;
+  margin-top: 2px;
+}
+
 .ika-scope-flightdeck .ika-fd-flightlog-stat{
   display: grid;
   grid-template-columns: 1fr auto;
@@ -2892,6 +2977,13 @@
   border-color: rgba(98,169,242,0.35);
 }
 
+
+.ika-scope-flightdeck .ika-fd-jumpto__links a.is-active {
+  background: rgba(98,169,242,0.18);
+  border-color: rgba(98,169,242,0.55);
+  box-shadow: 0 0 0 1px rgba(98,169,242,0.20) inset;
+}
+
 .ika-scope-flightdeck .ika-fd-jumpto__links a.is-secondary {
   opacity: 0.78;
 }
@@ -2915,3 +3007,121 @@
     font-size: 12.5px;
   }
 }
+
+/* =========================================================
+   Flight Deck — Jump To fallback (unscoped)
+   If Elementor wrapper class .ika-scope-flightdeck is missing,
+   these rules still allow sticky + active highlighting.
+========================================================= */
+
+.ika-fd-jumpto { position: sticky; top: 12px; z-index: 50; margin: 14px 0 18px; }
+.ika-fd-jumpto__links a.is-active {
+  background: rgba(98,169,242,0.18);
+  border-color: rgba(98,169,242,0.55);
+  box-shadow: 0 0 0 1px rgba(98,169,242,0.20) inset;
+}
+
+
+/* =========================================================
+   Flight Deck — Sticky Jump To Nav (v2 resilient)
+   Uses .is-stuck fixed fallback (JS toggles)
+   Also provides unscoped fallback rules to avoid relying on wrapper classes.
+========================================================= */
+
+/* Fixed fallback when JS toggles .is-stuck */
+.ika-scope-flightdeck .ika-fd-jumpto.is-stuck,
+.ika-fd-jumpto.is-stuck {
+  position: fixed !important;
+  top: var(--ika-fd-jumpto-top-runtime, var(--ika-fd-jumpto-top, 12px)) !important;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  margin: 0;
+}
+
+/* Ensure the inner container stays aligned/contained */
+.ika-fd-jumpto.is-stuck .ika-fd-jumpto__inner,
+.ika-scope-flightdeck .ika-fd-jumpto.is-stuck .ika-fd-jumpto__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Spacer used to prevent content jump */
+.ika-fd-jumpto-spacer {
+  width: 100%;
+  height: 0;
+}
+
+/* Stronger active state (make it obvious even if theme overrides links) */
+.ika-scope-flightdeck .ika-fd-jumpto__links a.is-active,
+.ika-fd-jumpto__links a.is-active {
+  border-color: rgba(98,169,242,0.95) !important;
+  box-shadow: 0 0 0 1px rgba(98,169,242,0.35) inset, 0 6px 16px rgba(0,0,0,0.22);
+  transform: translateY(-1px);
+}
+
+/* Smooth scrolling behavior when supported */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Jump To — active pill fix (avoid top edge looking clipped) */
+.ika-scope-flightdeck .ika-fd-jumpto__links a.is-active,
+.ika-fd-jumpto__links a.is-active {
+  transform: none !important;
+  box-shadow: inset 0 0 0 2px rgba(98,169,242,0.85), inset 0 0 18px rgba(98,169,242,0.20) !important;
+}
+
+/* Recommended Next shortcode */
+.ika-recnext{
+  border: 1px solid rgba(98,169,242,.25);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  background: rgba(13,19,31,.55);
+  backdrop-filter: blur(6px);
+}
+
+.ika-recnext__label{
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .8;
+  margin-bottom: 6px;
+}
+
+.ika-recnext__title{
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 6px;
+}
+
+.ika-recnext__reason{
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: .85;
+  margin-bottom: 10px;
+}
+
+.ika-recnext__cta{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  border: 1px solid rgba(98,169,242,.55);
+  background: rgba(98,169,242,.18);
+}
+
+.ika-recnext__cta:hover{
+  filter: brightness(1.05);
+}
+
+.ika-recnext--empty .ika-recnext__cta{
+  opacity: .95;
+}
+

@@ -155,3 +155,27 @@ if ( ! function_exists( 'ika_fd_format_attempt_date' ) ) {
 		}
 	}
 }
+
+if ( ! function_exists( 'ika_fd_parse_mysql_datetime_to_ts' ) ) {
+	/**
+	 * Best-effort: parse a MySQL DATETIME-ish string to a unix timestamp.
+	 * Returns 0 on failure.
+	 */
+	function ika_fd_parse_mysql_datetime_to_ts( $datetime ): int {
+		if ( empty( $datetime ) || ! is_string( $datetime ) ) return 0;
+		$ts = strtotime( $datetime );
+		return $ts ? (int) $ts : 0;
+	}
+}
+
+if ( ! function_exists( 'ika_fd_time_ago' ) ) {
+	/**
+	 * Human-friendly time-ago label for a unix timestamp.
+	 */
+	function ika_fd_time_ago( int $ts ): string {
+		if ( $ts <= 0 ) return '';
+		$now = (int) current_time( 'timestamp' );
+		if ( $ts > $now ) $ts = $now;
+		return human_time_diff( $ts, $now ) . ' ago';
+	}
+}

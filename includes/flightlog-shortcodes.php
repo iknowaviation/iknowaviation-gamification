@@ -53,13 +53,6 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
             </div>
         <?php else : ?>
             <?php
-            // Phase 1 placeholders — replace with WatuPRO attempt history + status mapping.
-            $summary = [
-                [ 'label' => 'Last quiz',               'value' => '2 hours ago' ],
-                [ 'label' => 'Average (last 10)',       'value' => '74%' ],
-                [ 'label' => 'Highest recent score',    'value' => '100%' ],
-            ];
-
             $user_id = get_current_user_id();
 
             global $wpdb;
@@ -80,9 +73,35 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
                 )
             );
 
-            $rows = [];
+			$rows = [];
+			$summary = [];
+			$activity_limit = max( 4, min( 12, $limit ) );
 
-            if ( ! empty( $attempts ) ) {
+			if ( ! empty( $attempts ) ) {
+				// Summary stats based on the most recent 10 attempts.
+				$last_ts = 0;
+				$pcts = [];
+				$max_pct = 0;
+
+				foreach ( array_slice( $attempts, 0, 10 ) as $a10 ) {
+					$ts10 = function_exists( 'ika_fd_parse_mysql_datetime_to_ts' ) ? ika_fd_parse_mysql_datetime_to_ts( (string) ( $a10->end_time ?? '' ) ) : (int) strtotime( (string) ( $a10->end_time ?? '' ) );
+					if ( $ts10 > $last_ts ) $last_ts = $ts10;
+					$pct10 = isset( $a10->percent_correct ) ? (int) round( (float) $a10->percent_correct ) : 0;
+					$pcts[] = $pct10;
+					if ( $pct10 > $max_pct ) $max_pct = $pct10;
+				}
+
+				$avg_pct = 0;
+				if ( ! empty( $pcts ) ) {
+					$avg_pct = (int) round( array_sum( $pcts ) / max( 1, count( $pcts ) ) );
+				}
+
+				$summary = [
+					[ 'label' => 'Last quiz',            'value' => ( $last_ts ? ( function_exists( 'ika_fd_time_ago' ) ? ika_fd_time_ago( $last_ts ) : '' ) : '—' ) ],
+					[ 'label' => 'Average (last 10)',    'value' => ( $avg_pct ? ( $avg_pct . '%' ) : '—' ) ],
+					[ 'label' => 'Highest recent score', 'value' => ( $max_pct ? ( $max_pct . '%' ) : '—' ) ],
+				];
+
                 // Count attempts per exam_id for the subset we're showing.
                 $exam_ids = array_values( array_unique( array_map( fn($r)=> (int) $r->exam_id, $attempts ) ) );
                 $counts = [];
@@ -133,17 +152,28 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
 
             <div class="ika-fd-flightlog-layout">
                 <!-- Summary -->
-                <div class="ika-fd-flightlog-summary">
-                    <div class="ika-fd-flightlog-summary__title">Recent Activity</div>
-                    <div class="ika-fd-flightlog-statlist">
-                        <?php foreach ( $summary as $s ) : ?>
-                            <div class="ika-fd-flightlog-stat">
-                                <span class="ika-fd-flightlog-label"><?php echo esc_html( $s['label'] ); ?>:</span>
-                                <span><?php echo esc_html( $s['value'] ); ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+			<div class="ika-fd-flightlog-summary">
+				<div class="ika-fd-flightlog-summary__title">Recent Activity</div>
+				<?php if ( ! empty( $summary ) ) : ?>
+					<div class="ika-fd-flightlog-statlist">
+						<?php foreach ( $summary as $s ) : ?>
+							<div class="ika-fd-flightlog-stat">
+								<span class="ika-fd-flightlog-label"><?php echo esc_html( $s['label'] ); ?>:</span>
+								<span><?php echo esc_html( $s['value'] ); ?></span>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+
+				<div class="ika-fd-flightlog-activity">
+					<?php
+					// Render combined quiz + mission bonus events.
+					if ( shortcode_exists( 'ika_fd_recent_activity' ) ) {
+						echo do_shortcode( '[ika_fd_recent_activity limit="' . intval( $activity_limit ) . '" days="14"]' );
+					}
+					?>
+				</div>
+			</div>
 
                 <!-- Table -->
                 <div class="ika-fd-flightlog-tablecard">

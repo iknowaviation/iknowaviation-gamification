@@ -3,7 +3,7 @@
  * Plugin Name: iKnowAviation – Gamification Engine
  * Description: Centralized gamification logic for WatuPRO, Watu Play, UsersWP, and Daily Missions.
  * Author: I Know Aviation LLC
- * Version: 1.2.2
+ * Version: 1.2.6
  * Text Domain: iknowaviation-gamification
  */
 
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Constants
  */
-define( 'IKA_GAM_PLUGIN_VERSION', '1.2.2' );
+define( 'IKA_GAM_PLUGIN_VERSION', '1.2.6' );
 define( 'IKA_GAM_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'IKA_GAM_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
 
@@ -65,6 +65,7 @@ ika_gam_safe_require( 'includes/streaks-status.php' );
  * NOTE: These MUST be loaded for [ika_rank_*] and [ika_xp_*] shortcodes to work.
  */
 ika_gam_safe_require( 'includes/hero-metrics-shortcodes.php' );
+ika_gam_safe_require( 'includes/ika-recent-xp-earned.php' );
 ika_gam_safe_require( 'includes/rank-card-shortcodes.php' );
 
 /**
@@ -80,6 +81,7 @@ ika_gam_safe_require( 'includes/badges-shortcodes.php' );
 /**
  * Flight Log (Flight Deck dashboard preview)
  */
+ika_gam_safe_require( 'includes/recent-activity-shortcodes.php' );
 ika_gam_safe_require( 'includes/flightlog-shortcodes.php' );
 
 /**
@@ -115,6 +117,15 @@ ika_gam_safe_require( 'includes/watuproplay-levels.php' );
 ika_gam_safe_require( 'includes/admin-debug-panel.php' );
 ika_gam_safe_require( 'includes/admin-menu-settings.php' );
 ika_gam_safe_require( 'includes/admin-tools-shortcodes.php' );
+
+/**
+ * Flight Deck — Recommended Next
+ */
+ika_gam_safe_require( 'includes/tools/class-ika-flightdeck-recommended-next.php' );
+ika_gam_safe_require( 'includes/tools/class-ika-admin-recnext-cache.php' );
+ika_gam_safe_require( 'includes/tools/class-ika-quiz-flightdeck-visibility.php' );
+ika_gam_safe_require( 'includes/tools/class-ika-flightdeck-recommended-next.php' );
+ika_gam_safe_require( 'includes/tools/class-ika-admin-recnext-settings.php' );
 
 /**
  * Importer

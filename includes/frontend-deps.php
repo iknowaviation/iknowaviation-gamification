@@ -53,7 +53,7 @@ if ( ! function_exists( 'ika_gam_is_flightdeck_page' ) ) {
 
         // Fast + explicit: Flight Deck page slug.
         // (This avoids relying on Elementor-rendered content, which is usually stored in post meta.)
-        if ( function_exists( 'is_page' ) && is_page( 'flight-deck' ) ) {
+        if ( function_exists( 'is_page' ) && is_page( 'flight-deck' ) || is_page( 'flightdeck' ) ) {
             return true;
         }
 
@@ -71,6 +71,8 @@ if ( ! function_exists( 'ika_gam_is_flightdeck_page' ) ) {
             'ika-scope-flightdeck',
             'ika-profile-hub',
             'ika-hub-hero',
+            'ika-fd-jumpto',
+            'fd-rankxp',
         );
 
         // Check classic post_content.
@@ -175,6 +177,17 @@ add_action( 'wp_enqueue_scripts', function () {
             ika_gam_asset_ver( $fd_js_rel ),
             true
         );
+
+        // Flight Deck JS (Jump To active-section highlighting)
+        $jumpto_js_rel = '/assets/js/ika_flightdeck_jumpto_active.js';
+        wp_enqueue_script(
+            'ika-flightdeck-jumpto',
+            IKA_GAM_PLUGIN_URL . $jumpto_js_rel,
+            array(),
+            ika_gam_asset_ver( $jumpto_js_rel ),
+            true
+        );
+
 // Flight Deck sub-page add-ons (only load when page matches)
         // Pages: /flight-deck/missions/ and /flight-deck/badges/
         if ( ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ) {
