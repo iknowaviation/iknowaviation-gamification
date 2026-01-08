@@ -97,7 +97,21 @@ class IKA_WatuPRO_Importer_Admin {
 						<p><strong><?php echo esc_html( $export_last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $export_last['message'] ); ?></p>
 					</div>
 				<?php endif; ?>
-	<hr />
+	
+				<?php
+				// Persistent last import result (fallback if transient notice was missed).
+				$last_saved = get_option( 'ika_watupro_import_last_result_option' );
+				if ( is_array( $last_saved ) && ! empty( $last_saved['log'] ) ) : ?>
+					<div style="margin:12px 0; padding:12px; border:1px solid #ccd0d4; background:#fff;">
+						<strong>Last Import Log (saved)</strong>
+						<details style="margin-top:8px;">
+							<summary>Show log</summary>
+							<pre style="margin-top:10px; white-space:pre-wrap;"><?php echo esc_html( implode( "\n", (array) $last_saved['log'] ) ); ?></pre>
+						</details>
+						<p style="margin:8px 0 0; color:#666;">Tip: If CPT creation fails, the exact PHP/DB error will appear here.</p>
+					</div>
+				<?php endif; ?>
+<hr />
 
 				<h2>Template Capture</h2>
 				<p>Refresh the <strong>Default</strong> template by copying quiz-level settings from an existing WatuPRO quiz (e.g., quiz <strong>#6</strong>).</p>

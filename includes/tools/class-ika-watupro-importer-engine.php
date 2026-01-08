@@ -261,13 +261,31 @@ class IKA_WatuPRO_Importer_Engine {
 				// Force desired platform default: allow retakes
 				$settings['take_again'] = 1;
 	
-				$quiz_block = [
-					'name'                 => $quiz_title,
-					'description_html'     => ( isset($qz['description_html']) && trim((string)$qz['description_html']) !== '' ) ? (string) $qz['description_html'] : (string) ( $defaults['description_html'] ?? '' ),
-					'final_screen_html'    => ( isset($qz['final_screen_html']) && trim((string)$qz['final_screen_html']) !== '' ) ? (string) $qz['final_screen_html'] : (string) ( $defaults['final_screen_html'] ?? '' ),
-					'reuse_questions_from' => '',
-					'settings'             => $settings,
-				];
+				// Template-first screens standard:
+// - Use template defaults for Description + Final Screen by default.
+// - Allow rare JSON one-off overrides via override_description_html / override_final_screen_html.
+// - Back-compat escape hatch: allow_json_screens=true enables legacy description_html/final_screen_html.
+$desc = (string) ( $defaults['description_html'] ?? '' );
+if ( isset($qz['override_description_html']) && trim((string)$qz['override_description_html']) !== '' ) {
+	$desc = (string) $qz['override_description_html'];
+} elseif ( ! empty($qz['allow_json_screens']) && isset($qz['description_html']) && trim((string)$qz['description_html']) !== '' ) {
+	$desc = (string) $qz['description_html'];
+}
+
+$final = (string) ( $defaults['final_screen_html'] ?? '' );
+if ( isset($qz['override_final_screen_html']) && trim((string)$qz['override_final_screen_html']) !== '' ) {
+	$final = (string) $qz['override_final_screen_html'];
+} elseif ( ! empty($qz['allow_json_screens']) && isset($qz['final_screen_html']) && trim((string)$qz['final_screen_html']) !== '' ) {
+	$final = (string) $qz['final_screen_html'];
+}
+
+$quiz_block = [
+	'name'                 => $quiz_title,
+	'description_html'     => $desc,
+	'final_screen_html'    => $final,
+	'reuse_questions_from' => '',
+	'settings'             => $settings,
+];
 	
 				if ( empty($qz['questions']) || ! is_array($qz['questions']) ) {
 					throw new Exception( 'Missing questions array at quizzes['.$qi.'].' );
@@ -321,10 +339,25 @@ class IKA_WatuPRO_Importer_Engine {
 				}
 	
 				$payload = [
+					'schema_version' => '1.1',
 					'quiz'      => $quiz_block,
 					'questions' => $questions,
 				];
-	
+
+				// Pass-through WordPress linkage blocks for CPT hierarchy + taxonomy tagging.
+				if ( isset( $qz['wp'] ) && is_array( $qz['wp'] ) ) {
+					$payload['wp'] = $qz['wp'];
+				}
+
+				// Recommended Next sequencing support.
+				if ( isset( $qz['menu_order'] ) ) {
+					$payload['menu_order'] = (int) $qz['menu_order'];
+				}
+
+				// Optional: allow excluding items from recommendation rails.
+				if ( isset( $qz['_ika_recommendable'] ) ) {
+					$payload['_ika_recommendable'] = (bool) $qz['_ika_recommendable'];
+				}
 				if ( $tags_block ) $payload['tags'] = $tags_block;
 	
 				$payloads[] = $payload;
@@ -422,11 +455,19 @@ class IKA_WatuPRO_Importer_Engine {
 									self::apply_wp_hierarchy_and_tax( 0, $data, $log, 'dry' );
 } else {
 						  try {
-							$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log );
+							$menu_order = isset( $data['menu_order'] ) ? (int) $data['menu_order'] : 0;
+							$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log, $menu_order );
 	
 							if ( $post_id ) {
 							  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
 							  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
+
+								  // Optional recommendability flag (default: recommendable if omitted).
+								  if ( array_key_exists( '_ika_recommendable', $data ) ) {
+									self::upsert_postmeta_db( (int) $post_id, '_ika_recommendable', ( $data['_ika_recommendable'] ? '1' : '0' ) );
+									$log[] = "Set post meta _ika_recommendable=" . ( $data['_ika_recommendable'] ? '1' : '0' ) . ".";
+								  }
+
 														  // Apply wp.parent_slug + wp.tax (hierarchy + recommendation tagging)
 												  self::apply_wp_hierarchy_and_tax( (int) $post_id, $data, $log, 'live' );
 } else {
@@ -856,117 +897,75 @@ class IKA_WatuPRO_Importer_Engine {
 			return $aid;
 		}
 
-	public static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log ) : int {
-			global $wpdb;
-	
-			$post_type = self::CPT_POST_TYPE;
-	
-			if ( ! post_type_exists( $post_type ) ) {
-				$log[] = "CPT sync skipped: post_type '{$post_type}' does not exist.";
-				return 0;
-			}
-	
-			$title   = sanitize_text_field( (string) ( $quiz['name'] ?? '' ) );
-			$content = '[watupro ' . (int) $exam_id . ']';
-			$status  = 'publish'; // Requested: create posts as publish.
-	
-			// Find existing CPT post by exam_id meta (direct DB to avoid hooks)
-			$pm = $wpdb->postmeta;
-			$pp = $wpdb->posts;
-	
-			$existing_id = (int) $wpdb->get_var(
-				$wpdb->prepare(
-					"SELECT p.ID
-					 FROM {$pp} p
-					 INNER JOIN {$pm} m ON m.post_id = p.ID
-					 WHERE p.post_type = %s
-					   AND m.meta_key = %s
-					   AND m.meta_value = %s
-					 ORDER BY p.ID DESC
-					 LIMIT 1",
-					$post_type,
-					self::CPT_META_EXAM_ID,
-					(string) $exam_id
-				)
-			);
-	
-			$now_local = current_time( 'mysql' );
-			$now_gmt   = current_time( 'mysql', 1 );
-			$author_id = get_current_user_id();
-			if ( ! $author_id ) $author_id = 1;
-	
-			if ( $existing_id > 0 ) {
-				// Update wp_posts directly (bypass wp_update_post hooks)
-				$ok = $wpdb->update(
-					$pp,
-					[
-						'post_title'        => $title,
-						'post_content'      => $content,
-						'post_status'       => $status,
-						'post_modified'     => $now_local,
-						'post_modified_gmt' => $now_gmt,
-					],
-					[ 'ID' => $existing_id ],
-					[ '%s','%s','%s','%s','%s' ],
-					[ '%d' ]
-				);
-	
-				if ( $ok === false ) {
-					throw new Exception( 'CPT DB update failed: ' . $wpdb->last_error );
-				}
-	
-				$post_id = $existing_id;
-				$log[] = "Updated CPT post ID={$post_id} via direct DB (forced content: [watupro {$exam_id}]).";
-			} else {
-				// Insert wp_posts directly (bypass wp_insert_post hooks)
-				$ins = $wpdb->insert(
-					$pp,
-					[
-						'post_author'       => $author_id,
-						'post_date'         => $now_local,
-						'post_date_gmt'     => $now_gmt,
-						'post_content'      => $content,
-						'post_title'        => $title,
-						'post_status'       => $status,
-						'comment_status'    => 'closed',
-						'ping_status'       => 'closed',
-						'post_name'         => '', // optional: leave blank; WP will generate if you edit later
-						'post_modified'     => $now_local,
-						'post_modified_gmt' => $now_gmt,
-						'post_type'         => $post_type,
-					],
-					[ '%d','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s','%s' ]
-				);
-	
-				if ( $ins === false ) {
-					throw new Exception( 'CPT DB insert failed: ' . $wpdb->last_error );
-				}
-	
-				$post_id = (int) $wpdb->insert_id;
-	
-				// Set a reasonable GUID (not critical, but helps consistency).
-				$guid = home_url( '/?post_type=' . $post_type . '&p=' . $post_id );
-				$wpdb->update(
-					$pp,
-					[ 'guid' => $guid ],
-					[ 'ID' => $post_id ],
-					[ '%s' ],
-					[ '%d' ]
-				);
-	
-				$log[] = "Created CPT post ID={$post_id} via direct DB (forced content: [watupro {$exam_id}]).";
-			}
-	
-			// Upsert post meta directly (avoid update_post_meta hooks)
-			self::upsert_postmeta_db( $post_id, self::CPT_META_EXAM_ID, (string) $exam_id );
-			self::upsert_postmeta_db( $post_id, self::CPT_META_IMPORT_HASH, hash( 'sha256', $raw_json ) );
-	
-			if ( function_exists( 'clean_post_cache' ) ) {
-				clean_post_cache( $post_id );
-			}
-	
-			return (int) $post_id;
+	public static function upsert_quiz_cpt_post( int $exam_id, array $quiz, string $raw_json, array &$log, int $menu_order = 0 ) : int {
+	// Use core APIs to avoid wpdb format mismatches and ensure post_type is correct.
+	$post_type = self::CPT_POST_TYPE;
+
+	if ( ! post_type_exists( $post_type ) ) {
+		$log[] = "CPT sync skipped: post_type '{$post_type}' does not exist.";
+		return 0;
+	}
+
+	$title   = sanitize_text_field( (string) ( $quiz['name'] ?? '' ) );
+	$content = '[watupro ' . (int) $exam_id . ']';
+	$status  = 'publish';
+
+	// Find existing CPT post by exam-id meta.
+	$existing_id = 0;
+	$existing = get_posts( [
+		'post_type'              => $post_type,
+		'post_status'            => 'any',
+		'posts_per_page'         => 1,
+		'fields'                 => 'ids',
+		'no_found_rows'          => true,
+		'ignore_sticky_posts'    => true,
+		'update_post_meta_cache' => false,
+		'update_post_term_cache' => false,
+		'meta_query'             => [
+			[
+				'key'   => self::CPT_META_EXAM_ID,
+				'value' => (string) $exam_id,
+			],
+		],
+	] );
+	if ( ! empty( $existing ) ) {
+		$existing_id = (int) $existing[0];
+	}
+
+	$now_local = current_time( 'mysql' );
+	$now_gmt   = current_time( 'mysql', 1 );
+
+	$postarr = [
+		'post_type'         => $post_type,
+		'post_title'        => $title,
+		'post_content'      => $content,
+		'post_status'       => $status,
+		'menu_order'        => (int) $menu_order,
+		'post_modified'     => $now_local,
+		'post_modified_gmt' => $now_gmt,
+	];
+
+	if ( $existing_id > 0 ) {
+		$postarr['ID'] = (int) $existing_id;
+		$post_id = wp_update_post( $postarr, true );
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( 'CPT update failed: ' . $post_id->get_error_message() );
 		}
+		$log[] = "Updated CPT post ID={$post_id} via wp_update_post (forced content: [watupro {$exam_id}]).";
+	} else {
+		$post_id = wp_insert_post( $postarr, true );
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( 'CPT insert failed: ' . $post_id->get_error_message() );
+		}
+		$log[] = "Created CPT post ID={$post_id} via wp_insert_post (forced content: [watupro {$exam_id}]).";
+	}
+
+	// Ensure exam meta is present and correct.
+	update_post_meta( (int) $post_id, self::CPT_META_EXAM_ID, (string) $exam_id );
+	$log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$exam_id}.";
+
+	return (int) $post_id;
+}
 
 	public static function upsert_postmeta_db( int $post_id, string $meta_key, string $meta_value ) : void {
 			global $wpdb;
