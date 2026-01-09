@@ -37,7 +37,7 @@ add_filter( 'register_post_type_args', function( array $args, string $post_type 
  * These are attached to the `quiz` CPT and used by the importer.
  */
 add_action( 'init', function() {
-	$post_types = [ 'quiz' ];
+	$post_types = [ 'quiz', 'briefingroom', 'academy' ];
 
 	$common = [
 		'public'            => true,

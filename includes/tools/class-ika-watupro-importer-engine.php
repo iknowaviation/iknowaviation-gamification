@@ -559,6 +559,24 @@ $quiz_block = [
 		$tax = $wp['tax'] ?? null;
 		if ( ! is_array( $tax ) ) return;
 
+		// ---- Defaults & normalization (Audience + Level/Difficulty) ----
+		// Audience: optional; default to aviation-curious if missing.
+		if ( ! isset( $tax['ika_quiz_audience'] ) ) {
+			$tax['ika_quiz_audience'] = [ 'aviation-curious' ];
+		}
+
+		// Level/Difficulty: level is canonical; ika_quiz_difficulty mirrors level.
+		$has_level = isset( $tax['level'] ) && ! empty( $tax['level'] );
+		$has_diff  = isset( $tax['ika_quiz_difficulty'] ) && ! empty( $tax['ika_quiz_difficulty'] );
+		if ( ! $has_level && ! $has_diff ) {
+			$tax['level'] = [ 'beginner' ];
+			$tax['ika_quiz_difficulty'] = [ 'beginner' ];
+		} elseif ( $has_level && ! $has_diff ) {
+			$tax['ika_quiz_difficulty'] = (array) $tax['level'];
+		} elseif ( $has_diff && ! $has_level ) {
+			$tax['level'] = (array) $tax['ika_quiz_difficulty'];
+		}
+
 		foreach ( $tax as $taxonomy => $terms ) {
 			$taxonomy = sanitize_key( (string) $taxonomy );
 			if ( $taxonomy === '' ) continue;
