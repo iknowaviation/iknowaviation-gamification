@@ -4526,3 +4526,239 @@ h3.elementor-heading-title{ font-size: clamp(18px, 1.8vw, 26px); }
     gap: 7px !important;
   }
 }
+
+/* --------------------------------------------------------------------- */
+/* Recommendations rail (base, site-wide)                                */
+/* --------------------------------------------------------------------- */
+
+.ika-rec-rail{
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: var(--ika-space-md, 16px);
+}
+
+.ika-rec-rail__head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap: var(--ika-space-md, 16px);
+  margin-bottom: var(--ika-space-md, 16px);
+}
+
+.ika-rec-rail__label{
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.ika-rec-rail__desc{
+  margin: 6px 0 0 0;
+  opacity: 0.78;
+  line-height: 1.35;
+}
+
+.ika-rec-rail__grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ika-space-md, 16px);
+}
+
+@media (max-width: 980px){
+  .ika-rec-rail__grid{ grid-template-columns: 1fr; }
+}
+
+.ika-rec-card{
+  position: relative;
+  display:block;
+  text-decoration:none;
+  color: inherit;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: var(--ika-space-md, 16px);
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.ika-rec-card:hover{
+  transform: translateY(-1px);
+  border-color: rgba(98,169,242,0.35);
+  background: rgba(0,0,0,0.30);
+}
+
+.ika-rec-card__type{
+  display:inline-flex;
+  align-items:center;
+  height: 20px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  opacity: 0.9;
+  margin-bottom: 10px;
+}
+
+.ika-rec-card__title{
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+.ika-rec-card__meta{
+  opacity: 0.78;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+.ika-rec-card__cta{
+  font-weight: 700;
+  opacity: 0.92;
+}
+
+/* --------------------------------------------------------------------- */
+
+
+
+/* Recommendation rail: empty state */
+.ika-rec-empty{
+  border: 1px dashed rgba(98,169,242,0.35);
+  border-radius: 16px;
+  padding: 18px 16px;
+  background: rgba(13,19,31,0.35);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.ika-rec-empty__title{
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+.ika-rec-empty__desc{
+  opacity: 0.85;
+  font-size: 0.95em;
+  line-height: 1.35;
+}
+
+
+
+/* -------------------------------------------------------------------------
+   Recs v7 Card Polish (Option A1/A3 friendly)
+   - Slightly richer cards with consistent chips and "why" line.
+   - Also aligns Mission cards with chip styling.
+   ------------------------------------------------------------------------- */
+
+.ika-rec-rail__grid {
+  gap: 18px;
+}
+
+.ika-rec-card {
+  position: relative;
+  display: block;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  overflow: hidden;
+}
+
+.ika-rec-card:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+  background: radial-gradient(1200px 220px at 20% 0%, rgba(98,169,242,0.22), transparent 55%);
+  opacity: .55;
+}
+
+.ika-rec-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(98,169,242,0.22);
+  box-shadow: 0 14px 40px rgba(0,0,0,0.42);
+}
+
+.ika-rec-card__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  font-size: 12px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(13,19,31,0.55);
+  color: rgba(255,255,255,0.88);
+  margin-bottom: 10px;
+}
+
+.ika-rec-card--briefing .ika-rec-card__type { border-color: rgba(255,211,115,0.22); }
+.ika-rec-card--course   .ika-rec-card__type { border-color: rgba(98,169,242,0.22); }
+
+.ika-rec-card__title {
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+
+.ika-rec-card__meta {
+  font-size: 14px;
+  opacity: .82;
+  margin-bottom: 8px;
+}
+
+.ika-rec-card__why {
+  font-size: 13px;
+  opacity: .72;
+  margin-bottom: 14px;
+}
+
+.ika-rec-card__cta {
+  margin-top: auto;
+  font-weight: 700;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ika-rec-card__cta:after{
+  content: "→";
+  opacity: .8;
+  transform: translateY(-1px);
+}
+
+/* Mission chips: reuse the same pill feel */
+.ika-mission-card__label,
+.ika-mission-label,
+.ika-mission-pill {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  letter-spacing: .08em;
+  font-size: 11px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(13,19,31,0.55);
+  color: rgba(255,255,255,0.88);
+}
+
+/* Slightly richer mission card hover to match recs */
+.ika-mission-card {
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.ika-mission-card:hover{
+  transform: translateY(-2px);
+  border-color: rgba(98,169,242,0.18);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.40);
+}

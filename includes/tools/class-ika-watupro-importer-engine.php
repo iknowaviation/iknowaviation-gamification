@@ -459,7 +459,6 @@ $quiz_block = [
 							$post_id = self::upsert_quiz_cpt_post( (int) $quiz_id, $quiz, $raw_one, $log, $menu_order );
 	
 							if ( $post_id ) {
-							  $log[] = "CPT linked: post_id={$post_id}, meta(" . self::CPT_META_EXAM_ID . ")={$quiz_id}.";
 							  self::cpt_health_check( (int) $post_id, (int) $quiz_id, $log );
 
 								  // Optional recommendability flag (default: recommendable if omitted).
@@ -559,23 +558,26 @@ $quiz_block = [
 		$tax = $wp['tax'] ?? null;
 		if ( ! is_array( $tax ) ) return;
 
-		// ---- Defaults & normalization (Audience + Level/Difficulty) ----
+		// ---- Defaults & normalization (Audience + Levels) ----
 		// Audience: optional; default to aviation-curious if missing.
-		if ( ! isset( $tax['ika_quiz_audience'] ) ) {
+		if ( ! isset( $tax['ika_quiz_audience'] ) || empty( $tax['ika_quiz_audience'] ) ) {
 			$tax['ika_quiz_audience'] = [ 'aviation-curious' ];
 		}
 
-		// Level/Difficulty: level is canonical; ika_quiz_difficulty mirrors level.
-		$has_level = isset( $tax['level'] ) && ! empty( $tax['level'] );
-		$has_diff  = isset( $tax['ika_quiz_difficulty'] ) && ! empty( $tax['ika_quiz_difficulty'] );
-		if ( ! $has_level && ! $has_diff ) {
-			$tax['level'] = [ 'beginner' ];
-			$tax['ika_quiz_difficulty'] = [ 'beginner' ];
-		} elseif ( $has_level && ! $has_diff ) {
-			$tax['ika_quiz_difficulty'] = (array) $tax['level'];
-		} elseif ( $has_diff && ! $has_level ) {
-			$tax['level'] = (array) $tax['ika_quiz_difficulty'];
+		// Levels: canonical taxonomy is ika_quiz_difficulty (admin label: Levels).
+		// Accept legacy/alternate JSON keys: level, difficulty, ika_quiz_difficulty.
+		$level_terms = [];
+		if ( isset( $tax['ika_quiz_difficulty'] ) && ! empty( $tax['ika_quiz_difficulty'] ) ) {
+			$level_terms = (array) $tax['ika_quiz_difficulty'];
+		} elseif ( isset( $tax['level'] ) && ! empty( $tax['level'] ) ) {
+			$level_terms = (array) $tax['level'];
+		} elseif ( isset( $tax['difficulty'] ) && ! empty( $tax['difficulty'] ) ) {
+			$level_terms = (array) $tax['difficulty'];
+		} else {
+			$level_terms = [ 'beginner' ];
 		}
+		$tax['ika_quiz_difficulty'] = $level_terms;
+		unset( $tax['level'], $tax['difficulty'] );
 
 		foreach ( $tax as $taxonomy => $terms ) {
 			$taxonomy = sanitize_key( (string) $taxonomy );

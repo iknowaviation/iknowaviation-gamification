@@ -41,6 +41,7 @@ if ( ! function_exists( 'ika_gam_safe_require' ) ) {
 ika_gam_safe_require( 'includes/ranks-xp-core.php' );
 ika_gam_safe_require( 'includes/stats-rebuild.php' );
 ika_gam_safe_require( 'includes/quiz-taxonomies.php' );
+ika_gam_safe_require( 'includes/tools/class-ika-recommendations-v7.php' );
 ika_gam_safe_require( 'includes/quiz-wrapper.php' );
 ika_gam_safe_require( 'includes/frontend-deps.php' );
 
@@ -124,7 +125,6 @@ ika_gam_safe_require( 'includes/admin-tools-shortcodes.php' );
 ika_gam_safe_require( 'includes/tools/class-ika-flightdeck-recommended-next.php' );
 ika_gam_safe_require( 'includes/tools/class-ika-admin-recnext-cache.php' );
 ika_gam_safe_require( 'includes/tools/class-ika-quiz-flightdeck-visibility.php' );
-ika_gam_safe_require( 'includes/tools/class-ika-flightdeck-recommended-next.php' );
 ika_gam_safe_require( 'includes/tools/class-ika-admin-recnext-settings.php' );
 
 /**
