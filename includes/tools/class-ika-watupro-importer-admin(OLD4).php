@@ -97,37 +97,8 @@ class IKA_WatuPRO_Importer_Admin {
 				<h1>WatuPRO Importer / Exporter (JSON)</h1>
 	
 				<?php if ( $last ) : ?>
-					<?php
-						// Warnings UX: prefer structured report warnings; fallback to parsing log lines.
-						$warn_list = [];
-						if ( isset( $last['report']['warnings'] ) && is_array( $last['report']['warnings'] ) ) {
-							$warn_list = array_values( array_filter( array_map( 'strval', (array) $last['report']['warnings'] ) ) );
-						} elseif ( ! empty( $last['log'] ) && is_array( $last['log'] ) ) {
-							foreach ( $last['log'] as $line ) {
-								$line = (string) $line;
-								if ( stripos( $line, 'WARNING:' ) === 0 ) {
-									$warn_list[] = trim( preg_replace( '/^WARNING:\s*/i', '', $line ) );
-								}
-							}
-							$warn_list = array_values( array_unique( array_filter( $warn_list ) ) );
-						}
-						$warn_count = count( $warn_list );
-					?>
 					<div class="notice notice-<?php echo esc_attr( $last['ok'] ? 'success' : 'error' ); ?>">
 						<p><strong><?php echo esc_html( $last['ok'] ? 'Success' : 'Error' ); ?>:</strong> <?php echo esc_html( $last['message'] ); ?></p>
-
-						<?php if ( $warn_count > 0 ) : ?>
-							<p style="margin:6px 0 0;"><strong>Warnings:</strong> <?php echo esc_html( (string) $warn_count ); ?></p>
-							<details style="margin-top:8px;">
-								<summary>Show warnings</summary>
-								<ul style="margin:10px 0 0 18px; list-style:disc;">
-									<?php foreach ( $warn_list as $w ) : ?>
-										<li><?php echo esc_html( $w ); ?></li>
-									<?php endforeach; ?>
-								</ul>
-							</details>
-						<?php endif; ?>
-
 						<?php if ( ! empty( $last['log'] ) ) : ?>
 							<details style="margin-top:8px;">
 								<summary>View log</summary>

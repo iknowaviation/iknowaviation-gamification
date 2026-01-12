@@ -296,11 +296,12 @@ $quiz_block = [
 					if ( ! is_array($qq) ) throw new Exception( 'Invalid question object at quizzes['.$qi.'].questions['.$i.'].' );
 	
 					$qtext = isset($qq['q']) ? (string) $qq['q'] : '';
-					// IKA: Wrap question text in <h3> for consistent formatting (import-time only)
-					if ( ! preg_match('/^\s*<h3\b/i', $qtext) ) {
-						$qtext = '<h3 class="ika-question-title">' . $qtext . '</h3>';
+					$qtext = trim( (string) $qtext );
+					// IKA formatting: wrap question stem in <h3> for consistent results styling.
+					// If the author already provided a heading, do not double-wrap.
+					if ( $qtext !== '' && stripos( $qtext, '<h3' ) !== 0 ) {
+						$qtext = '<h3>' . $qtext . '</h3>';
 					}
-
 					if ( trim($qtext) === '' ) throw new Exception( 'Missing q at quizzes['.$qi.'].questions['.$i.'].' );
 	
 					$qtype_raw = isset($qq['type']) ? strtolower(trim((string)$qq['type'])) : 'single';
@@ -364,6 +365,8 @@ if ( $qtype === 'boolean' ) {
 						$answers[] = [
 							'answer_html' => $atext,
 							'correct'     => ! empty($cc['correct']) ? 1 : 0,
+							// WatuPRO scoring uses per-answer points. Without this, multi-select items can score as 0 even when correct.
+							'point'       => ! empty($cc['correct']) ? 1.00 : 0.00,
 						];
 					}
 	
@@ -951,7 +954,7 @@ if ( $qtype === 'boolean' ) {
 				'question_id'     => $question_id,
 				'answer'          => wp_kses_post( (string) $ans['answer_html'] ),
 				'correct'         => $correct ? '1' : '0',
-				'point'           => isset($ans['point']) ? (float) $ans['point'] : ( $correct ? 1.00 : 0.00 ),
+				'point'           => isset($ans['point']) ? (float) $ans['point'] : 0.00,
 				'sort_order'      => $sort_order,
 				'explanation'     => null, // locked: explanations are question-level only
 				'grade_id'        => '0',

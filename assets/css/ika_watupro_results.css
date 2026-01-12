@@ -1,274 +1,303 @@
 /*
  * iKnowAviation – WatuPRO Results Theme
- * (Split from ika_quiz.css during production hardening)
+ * CLEANED + CONSOLIDATED (2026-01-11)
+ *
+ * Goals:
+ * - Consistent answer row styling for single, boolean, and multi-select questions
+ * - Left-side IKA markers (✓ / ✕) for user-selected answers
+ * - Show correct-but-not-selected answers with subtle green (teaching cue)
+ * - Explanation block: clear "EXPLANATION" pill + readable spacing
+ * - Right-side Watu marks are removed via JS (ika_watupro_results_markers.js)
  */
-
-.ika-results-page .watupro-resolved .show-question-choices li[class*="user-answer"] {
-  background: #0b3a24;
-  border-color: #27ae60;
-  color: #eafff3;
+/* ============ RESULTS PAGE BASE ============ */
+.ika-results-main{
+  padding:22px 24px 20px;
+  background:var(--ika-page-bg-dark,#020818);
+  font-size:var(--ika-body-size,1rem);
 }
-
-.ika-results-page .watupro-resolved .show-question-choices li[class*="user-answer"]::before {
-  content: "✓";
-  color: #a4f8c2;
-}
-
-/* ---------- INCORRECTLY ANSWERED QUESTION ----------
-   Container:   .watupro-unresolved
-   Selected wrong answer: li[class*="user-answer"]
-   → Blue pill, no checkmark
-   Correct answer (non-selected) stays as neutral dark pill
-*/
-.ika-results-page .watupro-unresolved .show-question-choices li[class*="user-answer"] {
-  background: #7a0f1a;        /* deep aviation red */
-  border-color: #d64242;       /* brighter red outline */
-  color: #ffffff;
-}
-
-/* New: red X icon on the left, like the green ✓ for correct answers */
-.ika-results-page .watupro-unresolved .show-question-choices li[class*="user-answer"]::before {
-  content: "✕";              /* red X symbol */
-  color: #fecaca;             /* soft light red to contrast the dark pill */
-}
-
-/* ============ RESULTS PAGE LAYOUT (MATCHING THE THEME) ============ */
-
-.ika-results-main {
-  padding: 22px 24px 20px;
-  background: var(--ika-page-bg-dark, #020818);
-}
-
-/* RESULTS PAGE – PREVENT TEXT OVERLAP IN MAIN CONTENT */
 .ika-results-main,
-.ika-results-main * {
-  line-height: 1.5;
+.ika-results-main *{ line-height:1.5; }
+
+/* Remove top gap above results card (Elementor quiz single template) */
+.ika-results-page{ margin:0 auto 40px !important; }
+body.single-quiz .elementor-640 .elementor-element-0d1d4aa{
+  margin-top:0 !important;
+  padding-top:0 !important;
+}
+.ika-results-page > p:first-of-type{
+  display:none !important;
+  margin:0 !important;
+  padding:0 !important;
 }
 
-
-.ika-results-main {
-  font-size: var(--ika-body-size, 1rem);
+/* ============ STATS / CTA (unchanged look) ============ */
+.ika-stats-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+  margin-bottom:18px;
 }
-/* stats row */
-
-.ika-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 18px;
+.ika-stat-card{
+  background:#07152b;
+  border-radius:18px;
+  padding:14px 16px;
+  border:1px solid #18355c;
 }
-
-.ika-stat-card {
-  background: #07152b;
-  border-radius: 18px;
-  padding: 14px 16px;
-  border: 1px solid #18355c;
+.ika-stat-label{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  color:#8ca3cf;
+  margin-bottom:4px;
 }
-
-.ika-stat-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #8ca3cf;
-  margin-bottom: 4px;
+.ika-stat-value{
+  font-size:22px;
+  font-weight:700;
+  color:#ffffff;
 }
-
-.ika-stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #ffffff;
+.ika-stat-value span{ color:#8fd3ff; }
+.ika-stat-mini{
+  font-size:12px;
+  color:#b0c3e6;
+  margin-top:4px;
 }
 
-.ika-stat-value span {
-  color: #8fd3ff;
+.ika-btn-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:18px 0 10px;
+}
+.ika-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:9px 20px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:600;
+  text-decoration:none;
+  cursor:pointer;
+  border:1px solid transparent;
+  transition:background .15s ease,color .15s ease,box-shadow .15s ease,transform .1s ease;
+}
+.ika-btn-primary{
+  background:#007bff;
+  color:#ffffff;
+  box-shadow:0 8px 22px rgba(0,123,255,.45);
+}
+.ika-btn-primary:hover{ background:#005fcc; transform:translateY(-1px); }
+.ika-btn-secondary{
+  background:transparent;
+  color:#e4eeff;
+  border-color:#8fd3ff;
+}
+.ika-btn-secondary:hover{ background:#07152b; }
+
+.ika-share-row{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+  margin:12px 0 18px;
+  padding-bottom:12px;
+  border-bottom:1px solid #13243e;
+}
+.ika-share-label{
+  font-size:13px;
+  font-weight:600;
+  color:#c1d4ff;
 }
 
-.ika-stat-mini {
-  font-size: 12px;
-  color: #b0c3e6;
-  margin-top: 4px;
+.ika-next-steps{
+  background:#07152b;
+  border-radius:16px;
+  border:1px dashed #324c7a;
+  padding:12px 14px;
+  font-size:14px;
+  color:#d0ddff;
+  margin-bottom:20px;
+}
+.ika-next-steps ul{
+  margin:6px 0 0 1.2em;
+  padding-left:0;
 }
 
-/* CTA buttons on results page */
-
-.ika-btn-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 18px 0 10px;
+/* Style "Take another quiz" link as primary button */
+.ika-results-page a[href*="/quiz"]{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 24px;
+  border-radius:999px;
+  background:#1E5BBF;
+  color:#ffffff !important;
+  text-decoration:none;
+  border:none;
+  font-family:"Montserrat",system-ui,sans-serif;
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  cursor:pointer;
+  box-shadow:0 10px 25px rgba(15,23,42,.25);
+  transition:all .18s ease-out;
+}
+.ika-results-page a[href*="/quiz"]:hover{
+  background:#174A99;
+  transform:translateY(-1px);
+  box-shadow:0 14px 32px rgba(15,23,42,.35);
+}
+/* ============ ANSWER BREAKDOWN SECTION ============ */
+.ika-answer-section{
+  background:var(--ika-page-bg-dark,#020818);
+  padding-top:4px;
+  border-top:1px solid #13243e;
+}
+.ika-answer-title{
+  font-size:20px;
+  margin:0 0 4px;
+  color:#ffffff;
+  letter-spacing:.08em;
+}
+.ika-answer-note{
+  font-size:13px;
+  color:#9db0d6;
+  margin-bottom:10px;
+}
+.ika-footer-note{
+  margin-top:14px;
+  font-size:12px;
+  color:#9db0d6;
 }
 
-.ika-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 9px 20px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease,
-              transform 0.1s ease;
-}
-
-/* primary – solid blue */
-
-.ika-btn-primary {
-  background: #007bff;
-  color: #ffffff;
-  box-shadow: 0 8px 22px rgba(0, 123, 255, 0.45);
-}
-
-.ika-btn-primary:hover {
-  background: #005fcc;
-  transform: translateY(-1px);
-}
-
-/* secondary – outlined */
-
-.ika-btn-secondary {
-  background: transparent;
-  color: #e4eeff;
-  border-color: #8fd3ff;
-}
-
-.ika-btn-secondary:hover {
-  background: #07152b;
-}
-
-/* social share row */
-
-.ika-share-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 0 18px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #13243e;
-}
-
-.ika-share-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #c1d4ff;
-}
-
-/* recommended next steps */
-
-.ika-next-steps {
-  background: #07152b;
-  border-radius: 16px;
-  border: 1px dashed #324c7a;
-  padding: 12px 14px;
-  font-size: 14px;
-  color: #d0ddff;
-  margin-bottom: 20px;
-}
-
-.ika-next-steps ul {
-  margin: 6px 0 0 1.2em;
-  padding-left: 0;
-}
-
-/* answers section */
-
-.ika-answer-section {
-  background: var(--ika-page-bg-dark, #020818);
-  padding-top: 4px;
-  border-top: 1px solid #13243e;
-}
-
-.ika-answer-title {
-  font-size: 20px;
-  margin: 0 0 4px;
-  color: #ffffff;
-  letter-spacing: 0.08em;
-}
-
-.ika-answer-note {
-  font-size: 13px;
-  color: #9db0d6;
-  margin-bottom: 10px;
-}
-
-.ika-footer-note {
-  margin-top: 14px;
-  font-size: 12px;
-  color: #9db0d6;
-}
-
-/* ============ 
-
-RESULTS PAGE – MATCH QUESTION TEXT SIZE TO QUIZ QUESTIONS */
-
-/* Question headings and question text inside the results content */
+/* Match question text sizing (avoid global italic h3) */
 .ika-results-page .ika-results-main h3,
 .ika-results-page .ika-answer-section h3,
 .ika-results-page .ika-results-main .question-text,
-.ika-results-page .ika-answer-section .question-text {
-  font-size: 15px !important;   /* match quiz question size */
-  font-weight: 600;
-  line-height: 1.4;
-  font-style: normal;           /* remove the italic from the global h3 rule */
+.ika-results-page .ika-answer-section .question-text{
+  font-size:15px !important;
+  font-weight:600;
+  line-height:1.4;
+  font-style:normal;
+}
+/* ============ ANSWER ROWS (CORE LOGIC) ============ */
+/* Normalize answer text (avoid light-blue link look) */
+.ika-results-page .show-question-choices li.answer{
+  color:inherit;
+}
+.ika-results-page .show-question-choices li.answer .answer{
+  color:inherit !important;
+  font-weight:600;
+  text-decoration:none;
 }
 
-/* ============================================================
-   RESULTS PAGE – REMOVE TOP GAP ABOVE HERO CARD
-   ============================================================ */
-
-/* Pull the results card up under the page title */
-.ika-results-page {
-  margin: 0 auto 40px !important;  /* no top gap, keep bottom spacing */
+/* Selected & correct */
+.ika-results-page .show-question-choices li.answer.user-answer.correct-answer{
+  background:rgba(34,197,94,.20);
+  border-color:rgba(34,197,94,.55);
+  color:#ecfff4;
+}
+.ika-results-page .show-question-choices li.answer.user-answer.correct-answer::before{
+  content:"✓";
+  color:rgba(187,247,208,.95);
 }
 
-/* Also remove any section padding/margin from the quiz single template */
-body.single-quiz .elementor-640 .elementor-element-0d1d4aa {
-  margin-top: 0 !important;
-  padding-top: 0 !important;
+
+/* =========================================================
+   WATUPRO DEFAULT RIGHT-ICON OVERRIDE
+   WatuPRO's own style.css adds correct.png / wrong.png as a
+   background on `span.answer` for `.user-answer` and `.correct-answer`.
+   We disable those backgrounds inside the IKA results wrapper.
+   ========================================================= */
+.ika-results-page .show-question-choices li.answer.user-answer span.answer,
+.ika-results-page .show-question-choices li.answer.correct-answer span.answer{
+  background: none !important;
+  background-image: none !important;
+  padding-right: 0 !important;
 }
 
-/* Many quiz plugins output a top <p>&nbsp;</p> spacer inside the results wrapper.
-   This removes that first empty paragraph so the hero hugs the top of the card. */
-.ika-results-page > p:first-of-type {
-  display: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
+
+/* Selected & incorrect */
+.ika-results-page .show-question-choices li.answer.user-answer:not(.correct-answer){
+  background:rgba(239,68,68,.20);
+  border-color:rgba(239,68,68,.55);
+  color:#fff1f1;
+}
+.ika-results-page .show-question-choices li.answer.user-answer:not(.correct-answer)::before{
+  content:"✕";
+  color:rgba(254,202,202,.95);
 }
 
-/* ============================================================
-   RESULTS PAGE – STYLE "TAKE ANOTHER QUIZ" AS PRIMARY BUTTON
-   ============================================================ */
-
-/* Any quiz-related CTA links inside the results card */
-.ika-results-page a[href*="/quiz"] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 24px;
-  border-radius: 999px;
-  background: #1E5BBF;               /* primary blue */
-  color: #ffffff !important;         /* white text */
-  text-decoration: none;
-  border: none;
-  font-family: "Montserrat", system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
-  transition: all 0.18s ease-out;
+/* Correct but NOT selected (missed correct option) */
+.ika-results-page .show-question-choices li.answer.correct-answer:not(.user-answer){
+  background:rgba(34,197,94,.12);
+  border-color:rgba(34,197,94,.35);
+  color:#eafff2;
 }
 
-/* Hover state */
-.ika-results-page a[href*="/quiz"]:hover {
-  background: #174A99;
-  transform: translateY(-1px);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.35);
+/* IMPORTANT:
+   Right-side Watu correct/wrong marks are removed by JS by deleting the
+   .watupro-screen-reader spans (ika_watupro_results_markers.js).
+   As a safe fallback, keep the marker visually hidden (but do NOT touch li::before). */
+.ika-results-page .show-question-choices li.answer .watupro-screen-reader{
+  position:absolute !important;
+  width:1px !important;
+  height:1px !important;
+  margin:-1px !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  clip:rect(0,0,0,0) !important;
+  clip-path:inset(50%) !important;
+  white-space:nowrap !important;
+  border:0 !important;
 }
-
-/* =========================================
-   
+/* "Correct answer" pill (injected by JS for correct answers not selected) */
+.ika-results-page .show-question-choices li.answer.correct-answer:not(.user-answer){
+  position:relative;
+  padding-right:150px; /* room for the label */
+}
+.ika-results-page .show-question-choices li.answer .ika-missed-correct-label{
+  position:absolute;
+  right:16px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border-radius:999px;
+  background:rgba(34,197,94,.18);
+  border:1px solid rgba(34,197,94,.35);
+  color:rgba(220,255,236,.95);
+  white-space:nowrap;
+  pointer-events:none;
+}
+/* ============ EXPLANATION / FEEDBACK ============ */
+.ika-results-page .watupro-main-feedback{
+  margin-top:12px;
+  padding:54px 16px 14px; /* room for pill + spacing */
+  border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);
+  border-radius:12px;
+  line-height:1.55;
+  position:relative;
+}
+.ika-results-page .watupro-main-feedback::before{
+  content:"EXPLANATION";
+  position:absolute;
+  top:14px;
+  left:14px;
+  display:inline-flex;
+  align-items:center;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.80);
+}

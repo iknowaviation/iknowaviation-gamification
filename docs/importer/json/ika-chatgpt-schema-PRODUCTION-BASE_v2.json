@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.1",
+  "version": "1.0",
+  "quizzes": [
+    {
+      "quiz_title": "Aviation Basics Quiz 01 Example",
+      "base_exam_id": 0,
+      "menu_order": 10,
+      "_ika_recommendable": true,
+      "wp": {
+        "tax": {
+          "ika_quiz_group": [
+            "aviation-basics"
+          ],
+          "ika_quiz_track": [
+            "intro-to-aviation"
+          ],
+          "ika_quiz_topic": [
+            "lift",
+            "drag"
+          ],
+          "ika_quiz_difficulty": [
+            "beginner"
+          ],
+          "ika_quiz_audience": [
+            "aviation-curious"
+          ]
+        }
+      },
+      "questions": [
+        {
+          "q": "Which force directly opposes an aircraft's forward motion?",
+          "type": "single",
+          "explanation": "Drag is the aerodynamic force that resists motion through the air. As speed increases, drag generally increases.",
+          "choices": [
+            {
+              "a": "Drag",
+              "correct": true
+            },
+            {
+              "a": "Lift",
+              "correct": false
+            },
+            {
+              "a": "Thrust",
+              "correct": false
+            },
+            {
+              "a": "Weight",
+              "correct": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
