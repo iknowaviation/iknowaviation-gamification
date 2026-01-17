@@ -1,0 +1,579 @@
+/* ==========================================================================
+   iKnowAviation – Quiz Hub (Archive)
+   File: ika_quiz_hub.css
+
+   Scope:
+   - Quiz Hub toolbar (track pills, search, sort, apply)
+   - Quiz grid layout (3 / 2 / 1 columns)
+   - Pagination (lightweight chip emphasizes current page)
+
+   Design intent:
+   - Pagination should feel secondary and quiet
+   - Current page subtly highlighted, not button-heavy
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1) Hub container
+   ========================================================================== */
+
+.ika-quiz-hub{
+  max-width: 1240px;
+  margin: 10px auto 0;
+  padding-left: 18px;
+  padding-right: 18px;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+@media (max-width:767px){
+  .ika-quiz-hub{
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+.ika-quiz-hub__inner{
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+@media (max-width:767px){
+  .ika-quiz-hub__inner{
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}
+
+
+/* ==========================================================================
+   2) Toolbar + tracks
+   ========================================================================== */
+
+.ika-quiz-hub__toolbar{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  margin-bottom:14px;
+}
+
+.ika-quiz-hub__tracks{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:14px;
+}
+
+
+/* Track pills */
+.ika-quiz-hub .ika-pill,
+.ika-quiz-hub__track{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  height:30px;
+  padding:0 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(13,19,31,.35);
+  color:rgba(255,255,255,.92);
+  font-weight:600;
+  font-size:12px;
+  letter-spacing:.02em;
+  text-decoration:none;
+}
+
+.ika-quiz-hub .ika-pill:hover,
+.ika-quiz-hub__track:hover{
+  background:rgba(98,169,242,.14);
+  border-color:rgba(98,169,242,.35);
+}
+
+.ika-quiz-hub .ika-pill.is-active,
+.ika-quiz-hub .ika-pill[aria-current="page"],
+.ika-quiz-hub__track.is-active{
+  background:rgba(98,169,242,.22);
+  border-color:rgba(98,169,242,.55);
+  color:rgba(255,255,255,.96);
+}
+
+
+/* ==========================================================================
+   3) Controls row
+   ========================================================================== */
+
+.ika-quiz-hub__controls{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+/* Left: search + button */
+.ika-quiz-hub__controls-left{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex:1 1 auto;
+  min-width:0;
+}
+
+/* Right: sort */
+.ika-quiz-hub__controls-right{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  flex:0 0 auto;
+}
+
+/* Search wrapper keeps sizing; input carries the visual styling */
+.ika-quiz-hub__search{
+  flex:1 1 420px;
+  max-width:560px;
+  min-width:0;
+}
+
+.ika-quiz-hub__search input{
+  width:100%;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  color:rgba(255,255,255,.92);
+}
+
+/* Sort wrapper keeps sizing; select carries the visual styling */
+.ika-quiz-hub__sort{
+  flex:0 0 260px;
+  max-width:260px;
+}
+
+.ika-quiz-hub__sort select{
+  width:100%;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);
+  color:rgba(255,255,255,.92);
+}
+
+.ika-quiz-hub__go{
+  padding:8px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.22);
+  background:rgba(255,255,255,.06);
+  color:rgba(255,255,255,.92);
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+}
+
+.ika-quiz-hub__go:hover{
+  background:rgba(98,169,242,.14);
+  border-color:rgba(98,169,242,.35);
+}
+
+@media (max-width:767px){
+  .ika-quiz-hub__controls{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .ika-quiz-hub__controls-left,
+  .ika-quiz-hub__controls-right{
+    width:100%;
+  }
+  .ika-quiz-hub__controls-left{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .ika-quiz-hub__search,
+  .ika-quiz-hub__sort,
+  .ika-quiz-hub__go{
+    max-width:100%;
+    width:100%;
+  }
+}
+
+/* Empty state */
+.ika-quiz-hub__empty{
+  grid-column:1 / -1;
+  padding:22px 18px;
+  text-align:center;
+  border-radius:16px;
+  border:1px dashed rgba(255,255,255,.16);
+  background:rgba(255,255,255,.03);
+  color:rgba(255,255,255,.86);
+}
+
+
+/* ==========================================================================
+   4) Grid
+   ========================================================================== */
+
+.ika-quiz-hub__grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;
+}
+
+@media (max-width:1024px){
+  .ika-quiz-hub__grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media (max-width:767px){
+  .ika-quiz-hub__grid{
+    grid-template-columns:1fr;
+  }
+}
+
+
+/* ==========================================================================
+   5) Pagination (RESTORED – lightweight style)
+   ========================================================================== */
+
+.ika-quiz-hub__pagination{
+  display:flex;
+  justify-content:center;
+  margin-top:18px;
+  padding-bottom:18px;
+}
+
+.ika-quiz-hub__pagination ul{
+  list-style:none;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  padding:0;
+  margin:0;
+}
+
+.ika-quiz-hub__pagination li{
+  margin:0;
+}
+
+.ika-quiz-hub__pagination a,
+.ika-quiz-hub__pagination span{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:36px;
+  height:40px;
+  padding:0 14px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background:transparent;
+  color:rgba(255,255,255,.9);
+  text-decoration:none;
+  font-weight:600;
+}
+
+/* Hover: subtle */
+.ika-quiz-hub__pagination a:hover{
+  background:rgba(255,255,255,.06);
+  border-color:rgba(98,169,242,.45);
+}
+
+/* Current page: understated highlight */
+.ika-quiz-hub__pagination .current,
+.ika-quiz-hub__pagination [aria-current="page"]{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(255,255,255,.22);
+  color:rgba(255,255,255,.96);
+}
+
+/* ==========================================================================
+   7) Quiz Cards – Step B (Quiz Hub only)
+   Goals:
+   - Chips show Group + Difficulty (provided by shortcode)
+   - Score line: Best if completed, Last if not (logged-in only)
+   - Completed cards slightly de-emphasized (restore on hover)
+   - Keep existing global card look (no color/gradient overrides)
+   ========================================================================== */
+
+/* Make each card fill its grid cell so footers align */
+.ika-quiz-hub .ika-quiz-hub__grid > .ika-quiz-card{
+  height: 100%;
+}
+
+/* Body becomes a column so CTA can sit at the bottom consistently */
+.ika-quiz-hub .ika-quiz-card__body{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Title clamp for consistent card heights */
+.ika-quiz-hub .ika-quiz-card__title{
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Meta line stays subtle */
+.ika-quiz-hub .ika-quiz-card__meta{
+  opacity: .78;
+}
+
+/* Score line (Best/Last) */
+.ika-quiz-hub .ika-quiz-card__score{
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: .78;
+}
+
+/* CTA: restore the simple “START QUIZ” text style (not a full-width button) */
+.ika-quiz-hub .ika-quiz-card__cta{
+  margin-top: auto;              /* push to bottom */
+  align-self: flex-end;          /* bottom-right */
+  padding-top: 14px;
+
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+
+  color: #62A9F2;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+/* Hover: subtle brighten */
+.ika-quiz-hub .ika-quiz-card:hover .ika-quiz-card__cta{
+  color: #8FC3FF;
+}
+
+/* Completed: slightly de-emphasized */
+.ika-quiz-hub .ika-quiz-card.is-complete{
+  opacity: .78;
+  filter: saturate(.92);
+}
+.ika-quiz-hub .ika-quiz-card.is-complete:hover{
+  opacity: 1;
+  filter: none;
+}
+
+/* ===========================================================
+   Step B polish tweaks (scoped to Quiz Hub)
+   - Make score line easier to read
+   - Darken sort dropdown to match hub UI
+   =========================================================== */
+
+/* Score line (Best/Last) — slightly brighter for readability */
+.ika-quiz-hub .ika-quiz-card__score{
+  color: rgba(255,255,255,0.66);
+  opacity: 1;
+}
+
+/* Sort dropdown — dark UI instead of browser-white */
+.ika-quiz-hub .ika-quiz-hub__sort select{
+  width: 100%;
+  height: 44px;
+  padding: 10px 14px;
+
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.92);
+
+  outline: none;
+  appearance: none;
+}
+
+/* Options list */
+.ika-quiz-hub .ika-quiz-hub__sort select option{
+  background: #0D131F;
+  color: rgba(255,255,255,.95);
+}
+
+/* Hover/focus */
+.ika-quiz-hub .ika-quiz-hub__sort select:focus{
+  border-color: rgba(98,169,242,.55);
+  box-shadow: 0 0 0 3px rgba(98,169,242,.12);
+}
+
+/* ===========================================================
+   Dropdown arrow (select chevron) — minimal addition
+   =========================================================== */
+
+.ika-quiz-hub .ika-quiz-hub__sort select{
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20'%3E%3Cpath fill='rgba(255,255,255,0.75)' d='M5.6 7.4a1 1 0 0 1 1.4 0L10 10.4l3-3a1 1 0 1 1 1.4 1.4l-3.7 3.7a1 1 0 0 1-1.4 0L5.6 8.8a1 1 0 0 1 0-1.4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px 14px;
+  padding-right: 44px; /* room for chevron */
+}
+
+/* ==========================================================================
+   Search button (only) — override to avoid WP/Elementor blue
+   Notes:
+   - Kept intentionally specific to the hub apply/search button only.
+   - Uses !important to reliably override Elementor/Theme button rules.
+   ========================================================================== */
+
+.ika-quiz-hub .ika-quiz-hub__apply .ika-qh-apply,
+.ika-quiz-hub .ika-quiz-hub__apply button.ika-qh-apply,
+.ika-quiz-hub button.ika-qh-apply{
+  background: linear-gradient(180deg, rgba(31,42,58,0.92) 0%, rgba(20,27,38,0.92) 100%) !important;
+  color: rgba(233,241,255,0.96) !important;
+  border: 1px solid rgba(255,255,255,0.16) !important;
+  border-radius: 14px !important;
+  padding: 10px 16px !important;
+  height: 48px !important;
+
+  font-weight: 800 !important;
+  font-size: 12px !important;
+  letter-spacing: .06em !important;
+  text-transform: uppercase !important;
+
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03) !important;
+  cursor: pointer !important;
+
+  /* neutralize theme button defaults */
+  text-decoration: none !important;
+  outline: none !important;
+}
+
+.ika-quiz-hub .ika-quiz-hub__apply .ika-qh-apply:hover,
+.ika-quiz-hub .ika-quiz-hub__apply button.ika-qh-apply:hover,
+.ika-quiz-hub button.ika-qh-apply:hover{
+  background: linear-gradient(180deg, rgba(37,52,74,0.95) 0%, rgba(24,34,51,0.95) 100%) !important;
+  border-color: rgba(98,169,242,0.45) !important;
+}
+
+.ika-quiz-hub .ika-quiz-hub__apply .ika-qh-apply:active,
+.ika-quiz-hub .ika-quiz-hub__apply button.ika-qh-apply:active,
+.ika-quiz-hub button.ika-qh-apply:active{
+  transform: translateY(1px);
+}
+
+.ika-quiz-hub .ika-quiz-hub__apply .ika-qh-apply:focus-visible,
+.ika-quiz-hub .ika-quiz-hub__apply button.ika-qh-apply:focus-visible,
+.ika-quiz-hub button.ika-qh-apply:focus-visible{
+  box-shadow:
+    0 0 0 2px rgba(98,169,242,0.35),
+    inset 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+
+/* =========================================================
+   Search button final styling fix
+   - Dark style (not blue)
+   - Small visible border
+   - Height matches search input
+   - Scoped to Quiz Hub only
+   ========================================================= */
+
+.ika-quiz-hub button.ika-quiz-hub__go {
+  height: 48px; /* matches search input */
+  padding: 0 22px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 999px;
+
+  color: rgba(255,255,255,0.92);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.03),
+    0 6px 16px rgba(0,0,0,0.35);
+
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ika-quiz-hub button.ika-quiz-hub__go:hover {
+  background: rgba(255,255,255,0.09);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.05),
+    0 8px 20px rgba(0,0,0,0.45);
+}
+
+/* Step B card tweak: move group/difficulty pills below status row */
+.ika-quiz-hub .ika-quiz-card__pills{
+  margin-top: 34px;
+}
+
+/* =========================================================
+   Quiz Hub Card Polish (Option B)
+   - Keep contrast the same
+   - Tighten spacing rhythm: status → chips → title → meta
+   ========================================================= */
+
+/* Chips row: slightly tighter */
+.ika-quiz-hub .ika-quiz-card__pills{
+  margin-top: 24px; /* was larger */
+  gap: 8px;
+}
+
+/* Title spacing */
+.ika-quiz-hub .ika-quiz-card__title{
+  margin-top: 10px;
+}
+
+/* Meta spacing */
+.ika-quiz-hub .ika-quiz-card__meta{
+  margin-top: 6px;
+}
+
+/* Chip sizing: slightly shorter, same look */
+.ika-quiz-hub .ika-pill{
+  padding: 6px 12px;
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+/* Empty state */
+.ika-quiz-hub__empty{
+  width: 100%;
+  padding: 22px 18px;
+  margin-top: 18px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.72);
+  text-align: center;
+  font-weight: 600;
+}
+
+
+/* Empty state (Quiz Hub) */
+.ika-quiz-hub__empty-title{ font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
+.ika-quiz-hub__empty-sub{ font-size: 13px; color: rgba(255,255,255,0.65); margin-bottom: 12px; }
+.ika-quiz-hub__empty-clear{ display:inline-block; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); font-weight: 700; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.ika-quiz-hub__empty-clear:hover{ background: rgba(255,255,255,0.09); }
+
+/* =========================================================
+   Quiz Hub Empty State – spacing polish (override)
+   Safe patch: affects empty state only
+   ========================================================= */
+.ika-quiz-hub__empty{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.ika-quiz-hub__empty-title{
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.ika-quiz-hub__empty-sub{
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 6px 0;
+}
+
+.ika-quiz-hub__empty-clear{
+  margin-top: 6px;
+}

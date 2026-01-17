@@ -154,6 +154,41 @@ add_action( 'wp_enqueue_scripts', function () {
         ika_gam_asset_ver( $master_rel )
     );
 
+	/**
+	 * Quiz Hub (Quiz archive) CSS
+	 *
+	 * The Quiz archive template now renders a shortcode-driven hub, not an Elementor Loop Grid.
+	 * Keep its styling in a dedicated file so we can iterate safely.
+	 */
+	$hub_rel = 'assets/css/ika_quiz_hub.css';
+	$should_load_hub = false;
+
+	// Primary: Quiz CPT archive.
+	if ( function_exists( 'is_post_type_archive' ) && is_post_type_archive( 'quiz' ) ) {
+		$should_load_hub = true;
+	}
+
+	// Secondary: any page that contains the shortcode or marker (Elementor HTML widgets or templates).
+	if ( ! $should_load_hub && is_singular() ) {
+		$post_id = get_the_ID();
+		if ( $post_id ) {
+			$content = (string) get_post_field( 'post_content', $post_id );
+			$edata   = (string) get_post_meta( $post_id, '_elementor_data', true );
+			if ( stripos( $content, '[ika_quiz_hub' ) !== false || stripos( $edata, 'ika_quiz_hub' ) !== false || stripos( $edata, 'ika-quiz-hub' ) !== false ) {
+				$should_load_hub = true;
+			}
+		}
+	}
+
+	if ( $should_load_hub ) {
+		wp_enqueue_style(
+			'ika-quiz-hub',
+			IKA_GAM_PLUGIN_URL . $hub_rel,
+			array( 'ika-master' ),
+			ika_gam_asset_ver( $hub_rel )
+		);
+	}
+
 
 
     // 1b) Flight Deck / Profile Hub CSS (only on the Flight Deck page)
@@ -170,7 +205,77 @@ add_action( 'wp_enqueue_scripts', function () {
         
         // Flight Deck JS (leaderboard tabs)
         $fd_js_rel = '/assets/js/ika_flightdeck_leaderboard_tabs.js';
-// Watu Play modal styling (badge/level modal)
+        wp_enqueue_script(
+            'ika-flightdeck-tabs',
+            IKA_GAM_PLUGIN_URL . $fd_js_rel,
+            array(),
+            ika_gam_asset_ver( $fd_js_rel ),
+            true
+        );
+
+        // Flight Deck JS (Jump To active-section highlighting)
+        $jumpto_js_rel = '/assets/js/ika_flightdeck_jumpto_active.js';
+        wp_enqueue_script(
+            'ika-flightdeck-jumpto',
+            IKA_GAM_PLUGIN_URL . $jumpto_js_rel,
+            array(),
+            ika_gam_asset_ver( $jumpto_js_rel ),
+            true
+        );
+
+
+        // Flight Deck JS (Flight Log filter)
+        $fl_js_rel = '/assets/js/ika_flightdeck_flightlog_filter.js';
+        wp_enqueue_script(
+            'ika-flightdeck-flightlog-filter',
+            IKA_GAM_PLUGIN_URL . $fl_js_rel,
+            array(),
+            ika_gam_asset_ver( $fl_js_rel ),
+            true
+        );
+// Flight Deck sub-page add-ons (only load when page matches)
+        // Pages: /flight-deck/missions/ and /flight-deck/badges/
+        if ( ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ) {
+            $rel = '/assets/css/ika_flightdeck_missions.css';
+            wp_enqueue_style(
+                'ika-flightdeck-missions',
+                IKA_GAM_PLUGIN_URL . $rel,
+                array( 'ika-master', 'ika-flightdeck' ),
+                ika_gam_asset_ver( $rel )
+            );
+        }
+
+        if ( ika_gam_is_flightdeck_subpage( 'badges', 'ika-fd-marker--badges' ) ) {
+            $rel = '/assets/css/ika_flightdeck_badges.css';
+            wp_enqueue_style(
+                'ika-flightdeck-badges',
+                IKA_GAM_PLUGIN_URL . $rel,
+                array( 'ika-master', 'ika-flightdeck' ),
+                ika_gam_asset_ver( $rel )
+            );
+        }
+}
+
+    // 2) WatuPRO quiz + results theme CSS (ONLY on single Quiz CPT pages)
+    if ( ika_gam_is_quiz_single() ) {
+
+        $quiz_rel = '/assets/css/ika_watupro_quiz.css';
+        wp_enqueue_style(
+            'ika-watupro-quiz',
+            IKA_GAM_PLUGIN_URL . $quiz_rel,
+            array( 'ika-master' ),
+            ika_gam_asset_ver( $quiz_rel )
+        );
+
+        $results_rel = '/assets/css/ika_watupro_results.css';
+        wp_enqueue_style(
+            'ika-watupro-results',
+            IKA_GAM_PLUGIN_URL . $results_rel,
+            array( 'ika-master', 'ika-watupro-quiz' ),
+            ika_gam_asset_ver( $results_rel )
+        );
+
+        // Watu Play modal styling (badge/level modal)
         $modal_rel = '/assets/css/ika_watuproplay_modal.css';
         wp_enqueue_style(
             'ika-watuproplay-modal',

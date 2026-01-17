@@ -95,6 +95,7 @@ ika_gam_safe_require( 'includes/leaderboard-shortcodes.php' );
  * NOTE: If this file isn't present on the server yet, safe include prevents a fatal.
  */
 ika_gam_safe_require( 'includes/recommendations-shortcodes.php' );
+ika_gam_safe_require( 'includes/quiz-hub-shortcodes.php' );
 
 /**
  * Rank ladder helpers (Flight Deck)
