@@ -63,6 +63,23 @@
   --ika-text-muted: #6B7280;
   --ika-white: #ffffff;
 
+  /* =========================================================
+     STATUS CHIP TOKENS (platform-wide)
+     Standard: solid-fill chips (muted) across Quiz Hub,
+     Recommendations, Missions, and Flight Deck variants.
+     ========================================================= */
+  --ika-chip-new-bg: rgba(255,211,115,0.85);
+  --ika-chip-new-border: rgba(255,211,115,0.40);
+  --ika-chip-new-text: rgba(13,19,31,0.95);
+
+  --ika-chip-progress-bg: rgba(98,169,242,0.85);
+  --ika-chip-progress-border: rgba(98,169,242,0.45);
+  --ika-chip-progress-text: rgba(255,255,255,0.95);
+
+  --ika-chip-complete-bg: rgba(106,196,150,0.85);
+  --ika-chip-complete-border: rgba(106,196,150,0.45);
+  --ika-chip-complete-text: rgba(255,255,255,0.95);
+
 /* --- APP / UI TOKENS (canonical) --- */
 --ika-body-size: 1rem;
 --ika-h1-size: 2.25rem;
@@ -4736,6 +4753,69 @@ h3.elementor-heading-title{ font-size: clamp(18px, 1.8vw, 26px); }
   transform: translateY(-1px);
 }
 
+
+/* Recommendation card status chip (data-first, no behavior changes)
+   Uses data-state and ika-rec-card--state-* class hooks.
+   States: new | in_progress | completed | locked | unknown */
+.ika-rec-card[data-state]::after,
+.ika-rec-card[class*="ika-rec-card--state-"]::after{
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.88);
+  background: rgba(13,19,31,0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.30);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* NEW */
+.ika-rec-card[data-state="new"]::after,
+.ika-rec-card--state-new::after{
+  content: "NEW";
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* IN PROGRESS */
+.ika-rec-card[data-state="in_progress"]::after,
+.ika-rec-card--state-in_progress::after{
+  content: "IN PROGRESS";
+  border-color: rgba(98,169,242,0.35);
+}
+
+/* COMPLETED */
+.ika-rec-card[data-state="completed"]::after,
+.ika-rec-card--state-completed::after{
+  content: "COMPLETED";
+  border-color: rgba(170,220,195,0.35);
+  color: rgba(235,255,247,0.88);
+}
+
+/* LOCKED */
+.ika-rec-card[data-state="locked"]::after,
+.ika-rec-card--state-locked::after{
+  content: "LOCKED";
+  border-color: rgba(255,255,255,0.12);
+  opacity: .92;
+}
+
+/* UNKNOWN */
+.ika-rec-card[data-state="unknown"]::after,
+.ika-rec-card--state-unknown::after{
+  content: "";
+  display: none;
+}
+
 /* Mission chips: reuse the same pill feel */
 .ika-mission-card__label,
 .ika-mission-label,
@@ -4761,4 +4841,185 @@ h3.elementor-heading-title{ font-size: clamp(18px, 1.8vw, 26px); }
   transform: translateY(-2px);
   border-color: rgba(98,169,242,0.18);
   box-shadow: 0 12px 34px rgba(0,0,0,0.40);
+}
+
+/* =========================================================
+   STATUS CHIP BINDINGS — Missions (tokenized, EOF override)
+   Purpose:
+   - Replaces the temporary hard-coded RGBA “Mission Chip Force” patch.
+   - Ensures Flight Deck mission state chips use the platform chip tokens.
+   Notes:
+   - Mission chips intentionally live in the footer (variant-specific).
+   - EOF placement + !important ensures these win the cascade.
+   ========================================================= */
+
+.ika-fd-missions-preview .ika-dm-card[data-state="new"] .ika-dm-card-state,
+.ika-dm-card[data-state="new"] .ika-dm-card-state{
+  background: var(--ika-chip-new-bg) !important;
+  border: 1px solid var(--ika-chip-new-border) !important;
+  color: var(--ika-chip-new-text) !important;
+}
+
+.ika-fd-missions-preview .ika-dm-card[data-state="in_progress"] .ika-dm-card-state,
+.ika-dm-card[data-state="in_progress"] .ika-dm-card-state{
+  background: var(--ika-chip-progress-bg) !important;
+  border: 1px solid var(--ika-chip-progress-border) !important;
+  color: var(--ika-chip-progress-text) !important;
+}
+
+.ika-fd-missions-preview .ika-dm-card[data-state="completed"] .ika-dm-card-state,
+.ika-dm-card[data-state="completed"] .ika-dm-card-state{
+  background: var(--ika-chip-complete-bg) !important;
+  border: 1px solid var(--ika-chip-complete-border) !important;
+  color: var(--ika-chip-complete-text) !important;
+}
+
+/* =========================================================
+   STATUS CHIP BINDINGS — Badges (Flight Deck preview)
+   States:
+   - earned      -> COMPLETE token (green)
+   - locked      -> NEW token (amber)
+   - in_progress -> PROGRESS token (blue) [future-ready]
+   ========================================================= */
+
+.ika-fd-badge-card[data-state="earned"] .ika-fd-badge-chip,
+.ika-fd-badge-card--state-earned .ika-fd-badge-chip{
+  background: var(--ika-chip-complete-bg) !important;
+  border: 1px solid var(--ika-chip-complete-border) !important;
+  color: var(--ika-chip-complete-text) !important;
+}
+
+.ika-fd-badge-card[data-state="locked"] .ika-fd-badge-chip,
+.ika-fd-badge-card--state-locked .ika-fd-badge-chip{
+  background: var(--ika-chip-new-bg) !important;
+  border: 1px solid var(--ika-chip-new-border) !important;
+  color: var(--ika-chip-new-text) !important;
+}
+
+.ika-fd-badge-card[data-state="in_progress"] .ika-fd-badge-chip,
+.ika-fd-badge-card--state-in_progress .ika-fd-badge-chip{
+  background: var(--ika-chip-progress-bg) !important;
+  border: 1px solid var(--ika-chip-progress-border) !important;
+  color: var(--ika-chip-progress-text) !important;
+}
+
+
+
+/* =========================================================
+   STATUS CHIP BINDINGS — Recs (tokenized, EOF override)
+   Ensures the top-right Recs state chip uses platform solid-fill tokens.
+   States: new | in_progress | completed | locked
+   ========================================================= */
+
+.ika-rec-card[data-state="new"]::after,
+.ika-rec-card--state-new::after{
+  background: var(--ika-chip-new-bg) !important;
+  border: 1px solid var(--ika-chip-new-border) !important;
+  color: var(--ika-chip-new-text) !important;
+}
+
+.ika-rec-card[data-state="in_progress"]::after,
+.ika-rec-card--state-in_progress::after{
+  background: var(--ika-chip-progress-bg) !important;
+  border: 1px solid var(--ika-chip-progress-border) !important;
+  color: var(--ika-chip-progress-text) !important;
+}
+
+.ika-rec-card[data-state="completed"]::after,
+.ika-rec-card--state-completed::after{
+  background: var(--ika-chip-complete-bg) !important;
+  border: 1px solid var(--ika-chip-complete-border) !important;
+  color: var(--ika-chip-complete-text) !important;
+}
+
+/* LOCKED uses NEW token for now (same visual language as "not yet") */
+.ika-rec-card[data-state="locked"]::after,
+.ika-rec-card--state-locked::after{
+  background: var(--ika-chip-new-bg) !important;
+  border: 1px solid var(--ika-chip-new-border) !important;
+  color: var(--ika-chip-new-text) !important;
+  opacity: .92;
+}
+/* Recs: state chip (NEW / IN PROGRESS / COMPLETED) */
+.ika-scope-flightdeck .ika-rec-card[data-state]::after,
+.ika-scope-flightdeck .ika-rec-card[class*="ika-rec-card--state-"]::after,
+.ika-rec-card[data-state]::after,
+.ika-rec-card[class*="ika-rec-card--state-"]::after{
+  border-radius: 999px !important;
+  overflow: hidden !important;
+}
+
+/* Missions: state chip (not started / in progress / completed) */
+.ika-scope-flightdeck .ika-dm-card-state,
+.ika-dm-card-state{
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+/* =========================================================
+   CHIP SHAPE HARDENING - Flight Deck Recs + Missions (EOF)
+   Purpose:
+   - Prevent regressions where chips render as square/rect blocks.
+   - Enforce platform pill geometry for:
+       * Recs type chip (.ika-rec-card__type)
+       * Recs state chip (::after)
+       * Mission state chip (.ika-dm-card-state)
+   Notes:
+   - EOF placement + !important wins the cascade safely.
+   ========================================================= */
+
+/* Recs: type chip (QUIZ / BRIEFING / COURSE) */
+.ika-rec-card__type{
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+}
+
+/* Recs: state chip (NEW / IN PROGRESS / COMPLETED) */
+.ika-rec-card[data-state]::after,
+.ika-rec-card[class*="ika-rec-card--state-"]::after{
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 999px !important;
+  height: 22px !important;
+  padding: 0 10px !important;
+}
+
+/* Missions: state chip (Not started / In progress / Completed) */
+.ika-dm-card-state,
+.ika-fd-missions-preview .ika-dm-card-state{
+  display: inline-flex !important;
+  align-items: center !important;
+  border-radius: 999px !important;
+  padding: 6px 10px !important;
+  line-height: 1 !important;
+}
+
+/* =========================================================
+   FLIGHT DECK LAYOUT TOKENS (Hub vs Workspace)
+   Enforced by body classes added in the gamification plugin:
+     - ika-fd-layout--hub
+     - ika-fd-layout--workspace
+   ========================================================= */
+
+/* Workspace sub-pages (e.g., /flight-deck/badges/) should feel like a full
+   dark console, not a framed panel inside a light page background. */
+body.ika-fd-layout--workspace{
+  background: #0D131F !important;
+}
+
+/* Neutralize common theme wrappers that can force a light background behind
+   full-dark Flight Deck sub-pages. (Safe no-ops if selectors don't exist.) */
+body.ika-fd-layout--workspace #page,
+body.ika-fd-layout--workspace .site,
+body.ika-fd-layout--workspace #content,
+body.ika-fd-layout--workspace .site-content,
+body.ika-fd-layout--workspace .elementor-location-single,
+body.ika-fd-layout--workspace .elementor-location-archive{
+  background: transparent !important;
 }

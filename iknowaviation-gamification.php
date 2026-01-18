@@ -137,3 +137,52 @@ ika_gam_safe_require( 'includes/tools/class-ika-watupro-importer.php' );
  * Daily missions scaffold
  */
 ika_gam_safe_require( 'includes/daily-missions.php' );
+
+/**
+ * Flight Deck layout enforcement (Hub vs Workspace)
+ *
+ * Adds body classes so parent/child pages can be styled consistently by tokens:
+ *   - ika-scope-flightdeck
+ *   - ika-fd-layout--hub (exact hub page)
+ *   - ika-fd-layout--workspace (any child/subpage under the Flight Deck parent)
+ */
+add_filter( 'body_class', function( array $classes ) : array {
+	// Frontend only.
+	if ( is_admin() ) {
+		return $classes;
+	}
+
+	if ( ! is_page() ) {
+		return $classes;
+	}
+
+	global $post;
+	if ( ! $post instanceof WP_Post ) {
+		return $classes;
+	}
+
+	// Hub page is the page with slug "flight-deck".
+	$is_hub = ( $post->post_name === 'flight-deck' );
+
+	// Workspace pages are any descendants of the Flight Deck hub.
+	$is_descendant = false;
+	if ( ! $is_hub ) {
+		$ancestors = get_post_ancestors( $post );
+		if ( ! empty( $ancestors ) ) {
+			foreach ( $ancestors as $ancestor_id ) {
+				$ancestor = get_post( (int) $ancestor_id );
+				if ( $ancestor instanceof WP_Post && $ancestor->post_name === 'flight-deck' ) {
+					$is_descendant = true;
+					break;
+				}
+			}
+		}
+	}
+
+	if ( $is_hub || $is_descendant ) {
+		$classes[] = 'ika-scope-flightdeck';
+		$classes[] = $is_hub ? 'ika-fd-layout--hub' : 'ika-fd-layout--workspace';
+	}
+
+	return $classes;
+}, 20 );

@@ -118,7 +118,7 @@ class IKA_Recs_V7 {
 		if ( $context === 'results' && in_array( 'quiz', $types, true ) ) {
 			$retake = self::maybe_build_retake_item( $args['post_id'], $args['user_id'], $signals );
 			if ( $retake ) {
-				$items[] = self::format_item( $retake, $args['user_id'] );
+				$items[] = self::format_item( $retake );
 				self::debug_add( 'added retake item (score < 70)' );
 			}
 		}
@@ -162,7 +162,7 @@ class IKA_Recs_V7 {
 			if ( $t === 'course' && ! $can_show_courses ) continue;
 			if ( count( $items ) >= $args['limit'] ) break;
 			if ( ! empty( $by_type[ $t ] ) ) {
-				$items[] = self::format_item( array_shift( $by_type[ $t ] ), $args['user_id'] );
+				$items[] = self::format_item( array_shift( $by_type[ $t ] ) );
 			}
 		}
 
@@ -171,7 +171,7 @@ class IKA_Recs_V7 {
 			if ( ! in_array( $t, $types, true ) ) continue;
 			if ( $t === 'course' && ! $can_show_courses ) continue;
 			while ( count( $items ) < $args['limit'] && ! empty( $by_type[ $t ] ) ) {
-				$items[] = self::format_item( array_shift( $by_type[ $t ] ), $args['user_id'] );
+				$items[] = self::format_item( array_shift( $by_type[ $t ] ) );
 			}
 		}
 
@@ -204,19 +204,19 @@ class IKA_Recs_V7 {
 		}
 
 		$retake = self::maybe_build_retake_item( $quiz_post_id, $user_id, $signals );
-		if ( $retake ) $items[] = self::format_item( $retake, $user_id );
+		if ( $retake ) $items[] = self::format_item( $retake );
 
 		if ( ! $retake ) {
 			$quiz = self::get_candidates_for_type( 'quiz', $signals, $user_id, $quiz_post_id, 8 );
-			if ( ! empty( $quiz ) ) $items[] = self::format_item( $quiz[0], $user_id );
+			if ( ! empty( $quiz ) ) $items[] = self::format_item( $quiz[0] );
 		}
 
 		$brief = self::get_candidates_for_type( 'briefing', $signals, $user_id, $quiz_post_id, 8 );
-		if ( ! empty( $brief ) ) $items[] = self::format_item( $brief[0], $user_id );
+		if ( ! empty( $brief ) ) $items[] = self::format_item( $brief[0] );
 
 		if ( $can_show_courses ) {
 			$course = self::get_candidates_for_type( 'course', $signals, $user_id, $quiz_post_id, 8 );
-			if ( ! empty( $course ) ) $items[] = self::format_item( $course[0], $user_id );
+			if ( ! empty( $course ) ) $items[] = self::format_item( $course[0] );
 		}
 
 		return array_slice( $items, 0, $limit );
@@ -604,10 +604,9 @@ class IKA_Recs_V7 {
 	/* Formatting */
 	/* --------------------------------------------------------------------- */
 
-	private static function format_item( array $c, int $user_id ) : array {
+	private static function format_item( array $c ) : array {
 		$type = strval( $c['type'] ?? '' );
 		$pid  = intval( $c['post_id'] ?? 0 );
-		$user_id = intval( $user_id );
 
 		$chip = 'QUIZ';
 		if ( $type === 'briefing' ) $chip = 'BRIEFING';
@@ -642,139 +641,14 @@ class IKA_Recs_V7 {
 			$why   = $ov['reason'] ?? $why;
 		}
 
-		$state = self::resolve_item_state( $type, $pid, $user_id, $c );
-
-		// CTA normalization (data-first): align verb to state without changing routing/behavior.
-		// - Quizzes: Start vs Continue (and Review for completed, if ever shown).
-		// - Briefings/Courses: keep their existing verbs.
-		// IMPORTANT: Retake override (results page) is preserved because it sets an explicit CTA.
-		if ( $type === 'quiz' ) {
-			$has_override_cta = ( ! empty( $c['_override'] ) && is_array( $c['_override'] ) && isset( $c['_override']['cta'] ) && $c['_override']['cta'] !== '' );
-			if ( ! $has_override_cta ) {
-				if ( $state === 'in_progress' ) {
-					$cta = 'Continue quiz';
-				} else if ( $state === 'completed' ) {
-					$cta = 'Review quiz';
-				} else {
-					$cta = 'Start quiz';
-				}
-			}
-		}
-
 		return [
 			'type'  => $type,
-			'state' => $state,
 			'chip'  => $chip,
 			'title' => (string) $title,
 			'url'   => (string) $url,
 			'meta'  => (string) $meta,
 			'cta'   => (string) $cta,
 			'why'   => (string) $why,
-		];
-	}
-
-	/**
-	 * Resolve a recommendation item's state for a given user.
-	 * States: new | in_progress | completed | unknown
-	 */
-	private static function resolve_item_state( string $type, int $post_id, int $user_id, array $raw = [] ) : string {
-		$type = (string) $type;
-		$post_id = intval( $post_id );
-		$user_id = intval( $user_id );
-		if ( $post_id <= 0 || $user_id <= 0 ) return 'unknown';
-
-		// Retake override: treat as in_progress (even if user technically passed but <70).
-		if ( ! empty( $raw['_override'] ) && is_array( $raw['_override'] ) && $type === 'quiz' ) {
-			$cta = strtolower( (string) ( $raw['_override']['cta'] ?? '' ) );
-			if ( strpos( $cta, 'retake' ) !== false ) return 'in_progress';
-		}
-
-		if ( $type === 'quiz' ) {
-			return self::resolve_quiz_state_for_user( $user_id, $post_id );
-		}
-		if ( $type === 'briefing' ) {
-			return self::resolve_briefing_state_for_user( $user_id, $post_id );
-		}
-		if ( $type === 'course' ) {
-			// Enrollment/progress tracking is not guaranteed in Phase 1; default to unknown.
-			return 'unknown';
-		}
-
-		return 'unknown';
-	}
-
-	private static function resolve_briefing_state_for_user( int $user_id, int $post_id ) : string {
-		$user_id = intval( $user_id );
-		$post_id = intval( $post_id );
-		if ( $user_id <= 0 || $post_id <= 0 ) return 'unknown';
-
-		$key = 'ika_briefing_opened_' . $post_id;
-		$val = get_user_meta( $user_id, $key, true );
-		if ( ! empty( $val ) ) return 'completed';
-		return 'new';
-	}
-
-	private static function resolve_quiz_state_for_user( int $user_id, int $quiz_post_id ) : string {
-		$user_id = intval( $user_id );
-		$quiz_post_id = intval( $quiz_post_id );
-		if ( $user_id <= 0 || $quiz_post_id <= 0 ) return 'unknown';
-
-		$exam_id = self::resolve_exam_id_for_quiz_post( $quiz_post_id );
-		if ( $exam_id <= 0 ) return 'unknown';
-
-		$attempt = self::get_latest_attempt_for_user_exam( $user_id, $exam_id );
-		if ( $attempt === null ) return 'new';
-
-		if ( ! empty( $attempt['in_progress'] ) ) return 'in_progress';
-		if ( ! isset( $attempt['percent'] ) || $attempt['percent'] === null ) return 'unknown';
-
-		$pc = floatval( $attempt['percent'] );
-		// Completion threshold (confirmed): >=60% is a pass.
-		if ( $pc >= 60.0 ) return 'completed';
-		return 'in_progress';
-	}
-
-	/**
-	 * Returns latest attempt info for a user/exam, including in_progress.
-	 * - null => no attempts at all
-	 */
-	private static function get_latest_attempt_for_user_exam( int $user_id, int $exam_id ) : ?array {
-		global $wpdb;
-
-		$user_id = intval( $user_id );
-		$exam_id = intval( $exam_id );
-		if ( $user_id <= 0 || $exam_id <= 0 ) return null;
-
-		$tbl = $wpdb->prefix . 'watupro_taken_exams';
-		$row = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT percent_correct, in_progress
-				 FROM {$tbl}
-				 WHERE user_id = %d
-				   AND exam_id = %d
-				   AND (ignore_attempt IS NULL OR ignore_attempt = 0)
-				 ORDER BY COALESCE(end_time, start_time, date) DESC, ID DESC
-				 LIMIT 1",
-				$user_id,
-				$exam_id
-			)
-		);
-
-		if ( ! $row ) return null;
-
-		$in_progress = 0;
-		if ( isset( $row->in_progress ) ) $in_progress = intval( $row->in_progress );
-
-		$percent = null;
-		if ( isset( $row->percent_correct ) && $row->percent_correct !== null && $row->percent_correct !== '' ) {
-			$pc = floatval( $row->percent_correct );
-			$pc = max( 0, min( 100, $pc ) );
-			$percent = $pc;
-		}
-
-		return [
-			'in_progress' => ( $in_progress === 1 ),
-			'percent'     => $percent,
 		];
 	}
 
@@ -1021,24 +895,3 @@ private static function fallback_items( array $types ) : array {
 	}
 
 }
-
-/**
- * Briefing open tracking (Phase 1 lightweight).
- *
- * Purpose: enable data-first state on recommendation cards without any UI/CSS changes.
- * - Marks a briefing as "opened" for the current user when they view a single Briefing Room post.
- * - Storage: usermeta key ika_briefing_opened_{post_id} => timestamp
- *
- * Notes:
- * - Safe, additive, and backwards-compatible.
- * - If a user never views a briefing, state remains "new".
- */
-add_action( 'template_redirect', function() {
-	if ( ! is_user_logged_in() ) return;
-	if ( ! is_singular( 'briefingroom' ) ) return;
-	$post_id = function_exists( 'get_queried_object_id' ) ? intval( get_queried_object_id() ) : 0;
-	if ( $post_id <= 0 ) return;
-	$user_id = get_current_user_id();
-	if ( $user_id <= 0 ) return;
-	update_user_meta( $user_id, 'ika_briefing_opened_' . $post_id, time() );
-}, 20 );

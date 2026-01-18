@@ -644,23 +644,6 @@ class IKA_Recs_V7 {
 
 		$state = self::resolve_item_state( $type, $pid, $user_id, $c );
 
-		// CTA normalization (data-first): align verb to state without changing routing/behavior.
-		// - Quizzes: Start vs Continue (and Review for completed, if ever shown).
-		// - Briefings/Courses: keep their existing verbs.
-		// IMPORTANT: Retake override (results page) is preserved because it sets an explicit CTA.
-		if ( $type === 'quiz' ) {
-			$has_override_cta = ( ! empty( $c['_override'] ) && is_array( $c['_override'] ) && isset( $c['_override']['cta'] ) && $c['_override']['cta'] !== '' );
-			if ( ! $has_override_cta ) {
-				if ( $state === 'in_progress' ) {
-					$cta = 'Continue quiz';
-				} else if ( $state === 'completed' ) {
-					$cta = 'Review quiz';
-				} else {
-					$cta = 'Start quiz';
-				}
-			}
-		}
-
 		return [
 			'type'  => $type,
 			'state' => $state,

@@ -12,6 +12,27 @@
    - Current page subtly highlighted, not button-heavy
    ========================================================================== */
 
+/* ==========================================================================
+   STATUS CHIP TOKENS (shared)
+   NOTE: Master CSS also defines these. They are duplicated here defensively
+   in case this file is ever used standalone in a future template.
+   ========================================================================== */
+
+:root{
+  --ika-chip-new-bg: rgba(255, 211, 115, 0.86);
+  --ika-chip-new-text: rgba(26, 26, 26, 0.92);
+  --ika-chip-new-border: rgba(255, 211, 115, 0.55);
+
+  --ika-chip-progress-bg: rgba(98, 169, 242, 0.86);
+  --ika-chip-progress-text: rgba(255, 255, 255, 0.96);
+  --ika-chip-progress-border: rgba(98, 169, 242, 0.60);
+
+  --ika-chip-complete-bg: rgba(67, 250, 167, 0.78);
+  --ika-chip-complete-text: rgba(13, 19, 31, 0.92);
+  --ika-chip-complete-border: rgba(67, 250, 167, 0.62);
+}
+
+
 
 /* ==========================================================================
    1) Hub container

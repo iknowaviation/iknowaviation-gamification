@@ -137,6 +137,7 @@ add_shortcode( 'ika_fd_missions_preview', function ( $atts ) {
         $completed = ! empty( $st['completed'] );
 
         $state_label = $completed ? 'Completed' : ( $progress > 0 ? 'In progress' : 'Not started' );
+        $state_key   = $completed ? 'completed' : ( $progress > 0 ? 'in_progress' : 'new' );
         $reward_label = $cfg['reward'] ? sprintf( '+%d XP', (int) $cfg['reward'] ) : '';
 
         $items[] = [
@@ -145,6 +146,7 @@ add_shortcode( 'ika_fd_missions_preview', function ( $atts ) {
             'desc'      => $cfg['desc'],
             'reward'    => $reward_label,
             'state'     => $state_label,
+            'state_key' => $state_key,
             'progress'  => $progress,
             'target'    => (int) $cfg['target'],
             'completed' => $completed,
@@ -196,8 +198,8 @@ add_shortcode( 'ika_fd_missions_preview', function ( $atts ) {
 
         <div class="ika-dm-grid">
             <?php foreach ( $items as $m ) : ?>
-                <?php $card_url = ! empty( $m['completed'] ) ? '#fd-flightlog' : '#fd-recommended'; ?>
-                <a class="ika-dm-card<?php echo ! empty( $m['completed'] ) ? ' is-complete' : ''; ?>" href="<?php echo esc_url( $card_url ); ?>">
+                <?php $card_url = ( (isset($m['state_key']) && $m['state_key'] === 'completed') || ! empty( $m['completed'] ) ) ? '#fd-flightlog' : '#fd-recommended'; ?>
+                <a class="ika-dm-card ika-dm-card--state-<?php echo esc_attr( $m['state_key'] ); ?><?php echo ! empty( $m['completed'] ) ? ' is-complete' : ''; ?>" data-state="<?php echo esc_attr( $m['state_key'] ); ?>" href="<?php echo esc_url( $card_url ); ?>">
                     <div class="ika-dm-card-label"><?php echo esc_html( $m['label'] ); ?></div>
                     <div class="ika-dm-card-title"><?php echo esc_html( $m['title'] ); ?></div>
 
@@ -207,7 +209,7 @@ add_shortcode( 'ika_fd_missions_preview', function ( $atts ) {
 
                     <div class="ika-dm-card-footer">
                         <span class="ika-dm-card-reward"><?php echo esc_html( $m['reward'] ); ?></span>
-                        <span class="ika-dm-card-state"><?php echo esc_html( $m['state'] ); ?></span>
+                        <span class="ika-dm-card-state ika-status-chip"><?php echo esc_html( $m['state'] ); ?></span>
                     </div>
                 </a>
             <?php endforeach; ?>

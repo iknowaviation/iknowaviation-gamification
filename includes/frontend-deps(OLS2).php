@@ -145,17 +145,11 @@ if ( ! function_exists( 'ika_gam_is_flightdeck_subpage' ) ) {
 
 add_action( 'wp_enqueue_scripts', function () {
 
-    // Normalize plugin URL to prevent accidental double-slash URLs (301 redirects).
-    // Individual rel paths in this file include a leading '/'.
-    $ika_base_url = function_exists( 'untrailingslashit' )
-        ? untrailingslashit( IKA_GAM_PLUGIN_URL )
-        : rtrim( IKA_GAM_PLUGIN_URL, '/' );
-
     // 1) Site-wide master UI CSS (includes Quiz Hub / archive UI)
     $master_rel = '/assets/css/ika_master.css';
     wp_enqueue_style(
         'ika-master',
-        $ika_base_url . $master_rel,
+        IKA_GAM_PLUGIN_URL . $master_rel,
         array(),
         ika_gam_asset_ver( $master_rel )
     );
@@ -189,84 +183,84 @@ add_action( 'wp_enqueue_scripts', function () {
 	if ( $should_load_hub ) {
 		wp_enqueue_style(
 			'ika-quiz-hub',
-			$ika_base_url . '/' . ltrim( $hub_rel, '/' ),
+			IKA_GAM_PLUGIN_URL . $hub_rel,
 			array( 'ika-master' ),
 			ika_gam_asset_ver( $hub_rel )
 		);
 	}
 
 
+    // 1b) Flight Deck shared CSS
+    // Load on the main Flight Deck dashboard AND Flight Deck sub-pages.
+    $is_fd_dashboard = ika_gam_is_flightdeck_page();
+    $is_fd_subpage   = (
+        ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ||
+        ika_gam_is_flightdeck_subpage( 'badges',   'ika-fd-marker--badges' )
+    );
 
-    // 1b) Flight Deck base CSS
-    // Load on the main Flight Deck page AND on Flight Deck sub-pages (e.g. /flight-deck/badges/).
-    $is_fd_sub_missions = ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' );
-    $is_fd_sub_badges   = ika_gam_is_flightdeck_subpage( 'badges', 'ika-fd-marker--badges' );
-    $is_fd_context      = ika_gam_is_flightdeck_page() || $is_fd_sub_missions || $is_fd_sub_badges;
-
-    if ( $is_fd_context ) {
+    if ( $is_fd_dashboard || $is_fd_subpage ) {
         $fd_rel = '/assets/css/ika_flightdeck.css';
         wp_enqueue_style(
             'ika-flightdeck',
-            $ika_base_url . $fd_rel,
+            IKA_GAM_PLUGIN_URL . $fd_rel,
             array( 'ika-master' ),
             ika_gam_asset_ver( $fd_rel )
         );
-    
 
-        
-        // Flight Deck JS (leaderboard tabs)
-        $fd_js_rel = '/assets/js/ika_flightdeck_leaderboard_tabs.js';
-        wp_enqueue_script(
-            'ika-flightdeck-tabs',
-            $ika_base_url . $fd_js_rel,
-            array(),
-            ika_gam_asset_ver( $fd_js_rel ),
-            true
-        );
+        // Dashboard-only JS (avoid loading on sub-pages unless needed)
+        if ( $is_fd_dashboard ) {
+            // Flight Deck JS (leaderboard tabs)
+            $fd_js_rel = '/assets/js/ika_flightdeck_leaderboard_tabs.js';
+            wp_enqueue_script(
+                'ika-flightdeck-tabs',
+                IKA_GAM_PLUGIN_URL . $fd_js_rel,
+                array(),
+                ika_gam_asset_ver( $fd_js_rel ),
+                true
+            );
 
-        // Flight Deck JS (Jump To active-section highlighting)
-        $jumpto_js_rel = '/assets/js/ika_flightdeck_jumpto_active.js';
-        wp_enqueue_script(
-            'ika-flightdeck-jumpto',
-            $ika_base_url . $jumpto_js_rel,
-            array(),
-            ika_gam_asset_ver( $jumpto_js_rel ),
-            true
-        );
+            // Flight Deck JS (Jump To active-section highlighting)
+            $jumpto_js_rel = '/assets/js/ika_flightdeck_jumpto_active.js';
+            wp_enqueue_script(
+                'ika-flightdeck-jumpto',
+                IKA_GAM_PLUGIN_URL . $jumpto_js_rel,
+                array(),
+                ika_gam_asset_ver( $jumpto_js_rel ),
+                true
+            );
 
+            // Flight Deck JS (Flight Log filter)
+            $fl_js_rel = '/assets/js/ika_flightdeck_flightlog_filter.js';
+            wp_enqueue_script(
+                'ika-flightdeck-flightlog-filter',
+                IKA_GAM_PLUGIN_URL . $fl_js_rel,
+                array(),
+                ika_gam_asset_ver( $fl_js_rel ),
+                true
+            );
+        }
 
-        // Flight Deck JS (Flight Log filter)
-        $fl_js_rel = '/assets/js/ika_flightdeck_flightlog_filter.js';
-        wp_enqueue_script(
-            'ika-flightdeck-flightlog-filter',
-            $ika_base_url . $fl_js_rel,
-            array(),
-            ika_gam_asset_ver( $fl_js_rel ),
-            true
-        );
-
-        // Flight Deck sub-page add-ons (only load when page matches)
-        // Pages: /flight-deck/missions/ and /flight-deck/badges/
-        if ( $is_fd_sub_missions ) {
+        // Flight Deck sub-page add-ons
+        if ( ika_gam_is_flightdeck_subpage( 'missions', 'ika-fd-marker--missions' ) ) {
             $rel = '/assets/css/ika_flightdeck_missions.css';
             wp_enqueue_style(
                 'ika-flightdeck-missions',
-                $ika_base_url . $rel,
+                IKA_GAM_PLUGIN_URL . $rel,
                 array( 'ika-master', 'ika-flightdeck' ),
                 ika_gam_asset_ver( $rel )
             );
         }
 
-        if ( $is_fd_sub_badges ) {
+        if ( ika_gam_is_flightdeck_subpage( 'badges', 'ika-fd-marker--badges' ) ) {
             $rel = '/assets/css/ika_flightdeck_badges.css';
             wp_enqueue_style(
                 'ika-flightdeck-badges',
-                $ika_base_url . $rel,
+                IKA_GAM_PLUGIN_URL . $rel,
                 array( 'ika-master', 'ika-flightdeck' ),
                 ika_gam_asset_ver( $rel )
             );
         }
-}
+    }
 
     // 2) WatuPRO quiz + results theme CSS (ONLY on single Quiz CPT pages)
     if ( ika_gam_is_quiz_single() ) {
@@ -274,7 +268,7 @@ add_action( 'wp_enqueue_scripts', function () {
         $quiz_rel = '/assets/css/ika_watupro_quiz.css';
         wp_enqueue_style(
             'ika-watupro-quiz',
-            $ika_base_url . $quiz_rel,
+            IKA_GAM_PLUGIN_URL . $quiz_rel,
             array( 'ika-master' ),
             ika_gam_asset_ver( $quiz_rel )
         );
@@ -282,7 +276,7 @@ add_action( 'wp_enqueue_scripts', function () {
         $results_rel = '/assets/css/ika_watupro_results.css';
         wp_enqueue_style(
             'ika-watupro-results',
-            $ika_base_url . $results_rel,
+            IKA_GAM_PLUGIN_URL . $results_rel,
             array( 'ika-master', 'ika-watupro-quiz' ),
             ika_gam_asset_ver( $results_rel )
         );
@@ -291,7 +285,7 @@ add_action( 'wp_enqueue_scripts', function () {
         $modal_rel = '/assets/css/ika_watuproplay_modal.css';
         wp_enqueue_style(
             'ika-watuproplay-modal',
-            $ika_base_url . $modal_rel,
+            IKA_GAM_PLUGIN_URL . $modal_rel,
             array( 'ika-master' ),
             ika_gam_asset_ver( $modal_rel )
         );

@@ -278,7 +278,8 @@
 
 /* GENERIC SECTION WRAPPERS */
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-section {
-  padding: 18px 22px 6px;
+  /* Tighten global section rhythm (B5 parity) */
+  padding: 14px 22px 4px;
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header {
@@ -286,7 +287,7 @@
   justify-content: space-between;
   gap: 12px;
   align-items: baseline;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .ika-scope-flightdeck .ika-profile-hub .ika-hub-section-title {
@@ -1102,10 +1103,9 @@
 
 .ika-scope-flightdeck a.ika-fd-badge-card{
   display: grid;
-  grid-template-columns: 40px 1fr;
-  grid-template-rows: auto auto;
+  grid-template-columns: 40px 1fr auto;
+  grid-template-rows: auto;
   column-gap: 12px;
-  row-gap: 2px;
   align-items: center;
   text-decoration: none;
   border-radius: 16px;
@@ -1127,7 +1127,23 @@
   border-radius: 12px;
   background: rgba(0,0,0,0.22);
   border: 1px solid rgba(255,255,255,0.10);
-  grid-row: 1 / span 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.ika-scope-flightdeck .ika-fd-badge-icon__img{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ika-scope-flightdeck .ika-fd-badge-card[data-state="locked"] .ika-fd-badge-icon__img{
+  filter: grayscale(1) brightness(0.9);
+  opacity: 0.85;
 }
 
 /* Text */
@@ -1135,6 +1151,24 @@
   font-weight: 700;
   color: #ffffff;
   line-height: 1.2;
+}
+
+/* Status chip (earned / locked)
+   Color tokens are bound in ika_master.css so this stays variant-safe. */
+.ika-scope-flightdeck .ika-fd-badge-chip{
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  letter-spacing: .08em;
+  font-size: 11px;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(13,19,31,0.55);
+  color: rgba(255,255,255,0.88);
+  white-space: nowrap;
 }
 
 .ika-scope-flightdeck .ika-fd-badge-meta{
@@ -3125,3 +3159,172 @@ html {
   opacity: .95;
 }
 
+
+/* =========================================================
+   B5 ALIGNMENT: Section spacing normalization (Flight Deck)
+   Goal: Match the tighter, cleaner spacing used on /flight-deck/badges/
+   without changing any card layouts or states.
+   Scope: Elementor section blocks on the main Flight Deck page.
+   ========================================================= */
+
+/* Normalize Elementor text widget default <p> margins inside section kickers/links */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker p,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link p{
+  margin: 0;
+}
+
+/* Tighten header + kicker spacing to match Badges page rhythm */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head{
+  margin: 0 0 6px 0;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-title{
+  margin: 0 0 6px 0;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker{
+  margin: 0;
+}
+
+/* Section link sits closer to header/kicker (Badges page style) */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link{
+  margin: 10px 0 0 0;
+}
+
+/* Ensure content starts with consistent breathing room */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head + .ika-hub-cards{
+  margin-top: 12px;
+}
+
+
+/* Fallback for shortcode-driven section heads inside the Flight Deck page */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header{
+  margin: 0 0 6px 0;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-title{
+  margin: 0 0 6px 0;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-kicker{
+  margin: 0;
+}
+
+/* =========================================================
+   B5.2: Flight Deck global rhythm tighten (v2)
+   - More compact vertical spacing across all sections
+   - Unify sub-page links to match Badges page back-link style
+   - EOF overrides only (do not change layouts/cards)
+   ========================================================= */
+
+/* Global section block spacing */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section{
+  margin-bottom: 22px !important;
+}
+
+/* Head + kicker + link spacing */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-title{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker{
+  margin: 0 !important;
+}
+
+/* Links (View all ... ->) closer to kicker */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link{
+  margin: 8px 0 0 0 !important;
+}
+
+/* Content starts sooner */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head + .ika-hub-cards{
+  margin-top: 10px !important;
+}
+
+/* Shortcode section heads (if present) */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-title{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-kicker{
+  margin: 0 !important;
+}
+
+/* ---------------------------------------------------------
+   Link typography: match Badges page back-link
+   Applies only to section links in Flight Deck (not nav pills)
+   --------------------------------------------------------- */
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link a,
+.ika-scope-flightdeck .ika-profile-hub a.ika-hub-section-link{
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  text-decoration: none !important;
+  opacity: 0.95 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link a:hover,
+.ika-scope-flightdeck .ika-profile-hub a.ika-hub-section-link:hover{
+  opacity: 1 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+
+/* ---------------------------------------------------------
+   Global section spacing tighten (v2)
+   --------------------------------------------------------- */
+
+/* Reduce vertical space between major sections */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section{
+  margin-bottom: 22px !important;
+}
+
+/* Tighter head stack: title -> kicker -> link */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-title{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker{
+  margin: 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link{
+  margin: 8px 0 0 0 !important;
+}
+
+/* Pull cards closer to the header block */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-kicker + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-link + .ika-hub-cards,
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section__head + .ika-hub-cards{
+  margin-top: 10px !important;
+}
+
+/* Fallback: shortcode head container spacing */
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-title{
+  margin: 0 0 4px 0 !important;
+}
+
+.ika-scope-flightdeck .ika-profile-hub .ika-hub-section-header .ika-hub-section-kicker{
+  margin: 0 !important;
+}

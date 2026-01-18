@@ -22,3 +22,59 @@
 .ika-scope-flightdeck.ika-fd--missions .ika-fd-card {
   /* Missions cards / panels */
 }
+
+
+/* =========================================================
+   IKA STATUS CHIP (shared) — Missions
+   Uses global chip tokens (defined in ika_master.css)
+   ========================================================= */
+
+.ika-dm-card .ika-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  line-height: 1;
+  text-transform: uppercase;
+  border: 1px solid var(--ika-chip-border, rgba(255,255,255,0.14));
+  background: var(--ika-chip-bg, rgba(255,255,255,0.10));
+  color: var(--ika-chip-text, #fff);
+}
+
+/* State colors via parent card data-state */
+.ika-dm-card[data-state='new'] {
+  --ika-chip-bg: var(--ika-chip-new-bg);
+  --ika-chip-text: var(--ika-chip-new-text);
+  --ika-chip-border: var(--ika-chip-new-border);
+}
+.ika-dm-card[data-state='in_progress'] {
+  --ika-chip-bg: var(--ika-chip-progress-bg);
+  --ika-chip-text: var(--ika-chip-progress-text);
+  --ika-chip-border: var(--ika-chip-progress-border);
+}
+.ika-dm-card[data-state='completed'] {
+  --ika-chip-bg: var(--ika-chip-complete-bg);
+  --ika-chip-text: var(--ika-chip-complete-text);
+  --ika-chip-border: var(--ika-chip-complete-border);
+}
+
+/* Defensive binding (ensures solid-fill shows even if CSS variables are overridden elsewhere) */
+.ika-dm-card[data-state='new'] .ika-status-chip {
+  background: var(--ika-chip-new-bg) !important;
+  color: var(--ika-chip-new-text) !important;
+  border-color: var(--ika-chip-new-border) !important;
+}
+.ika-dm-card[data-state='in_progress'] .ika-status-chip {
+  background: var(--ika-chip-progress-bg) !important;
+  color: var(--ika-chip-progress-text) !important;
+  border-color: var(--ika-chip-progress-border) !important;
+}
+.ika-dm-card[data-state='completed'] .ika-status-chip {
+  background: var(--ika-chip-complete-bg) !important;
+  color: var(--ika-chip-complete-text) !important;
+  border-color: var(--ika-chip-complete-border) !important;
+}

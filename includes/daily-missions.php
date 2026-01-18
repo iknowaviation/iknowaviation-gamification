@@ -503,15 +503,16 @@ function ika_dm_shortcode_render() {
                 $progress  = (int) $mstate['progress'];
                 $target    = isset( $mission['target'] ) ? (int) $mission['target'] : 1;
                 $completed = ! empty( $mstate['completed'] );
+                $state_key = $completed ? 'completed' : ( $progress > 0 ? 'in_progress' : 'new' );
                 ?>
-                <div class="ika-dm-card <?php echo $completed ? 'ika-dm-card--completed' : 'ika-dm-card--active'; ?>">
+                <div class="ika-dm-card <?php echo $completed ? 'ika-dm-card--completed' : 'ika-dm-card--active'; ?> ika-dm-card--state-<?php echo esc_attr( $state_key ); ?>" data-state="<?php echo esc_attr( $state_key ); ?>">
                     <div class="ika-dm-card-main">
                         <div class="ika-dm-card-title-row">
                             <span class="ika-dm-card-title">
                                 <?php echo esc_html( $mission['label'] ); ?>
                             </span>
-                            <span class="ika-dm-card-status">
-                                <?php echo $completed ? 'Completed' : 'In Progress'; ?>
+                            <span class="ika-dm-card-status ika-status-chip">
+                                <?php echo $completed ? 'Completed' : ( $progress > 0 ? 'In Progress' : 'New' ); ?>
                             </span>
                         </div>
                         <p class="ika-dm-card-description">

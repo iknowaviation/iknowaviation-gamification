@@ -221,7 +221,7 @@ if ( class_exists( 'IKA_Recs_V7' ) ) {
 					</div>
 				<?php else : ?>
 					<?php foreach ( $items as $it ) : ?>
-					<a class="ika-rec-card ika-rec-card--<?php echo esc_attr( $it['type'] ?? 'item' ); ?>" href="<?php echo esc_url( $it['url'] ); ?>">
+					<a class="ika-rec-card ika-rec-card--<?php echo esc_attr( $it['type'] ?? 'item' ); ?> ika-rec-card--state-<?php echo esc_attr( $it['state'] ?? 'unknown' ); ?>" data-state="<?php echo esc_attr( $it['state'] ?? 'unknown' ); ?>" href="<?php echo esc_url( $it['url'] ); ?>">
 						<?php if ( ! empty( $it['chip'] ) ) : ?><div class="ika-rec-card__type"><?php echo esc_html( $it['chip'] ); ?></div><?php endif; ?>
 						<div class="ika-rec-card__title"><?php echo esc_html( $it['title'] ); ?></div>
 						<div class="ika-rec-card__meta"><?php echo esc_html( $it['meta'] ); ?></div>
