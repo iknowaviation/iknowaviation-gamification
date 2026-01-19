@@ -4905,121 +4905,40 @@ h3.elementor-heading-title{ font-size: clamp(18px, 1.8vw, 26px); }
 
 
 
-/* =========================================================
-   STATUS CHIP BINDINGS — Recs (tokenized, EOF override)
-   Ensures the top-right Recs state chip uses platform solid-fill tokens.
-   States: new | in_progress | completed | locked
-   ========================================================= */
+/* ==========================================================
+   Flight Deck Workspace Layout Fix
+   Scope dark background to content only (not header)
+   ========================================================== */
 
-.ika-rec-card[data-state="new"]::after,
-.ika-rec-card--state-new::after{
-  background: var(--ika-chip-new-bg) !important;
-  border: 1px solid var(--ika-chip-new-border) !important;
-  color: var(--ika-chip-new-text) !important;
+/* Remove any body-level dark enforcement */
+body.ika-fd-layout--workspace {
+    background: unset !important;
 }
 
-.ika-rec-card[data-state="in_progress"]::after,
-.ika-rec-card--state-in_progress::after{
-  background: var(--ika-chip-progress-bg) !important;
-  border: 1px solid var(--ika-chip-progress-border) !important;
-  color: var(--ika-chip-progress-text) !important;
+/* Apply full-dark background ONLY to Flight Deck workspace content */
+body.ika-fd-layout--workspace .ika-scope-flightdeck {
+    background: #0D131F;
+    min-height: 100vh;
 }
 
-.ika-rec-card[data-state="completed"]::after,
-.ika-rec-card--state-completed::after{
-  background: var(--ika-chip-complete-bg) !important;
-  border: 1px solid var(--ika-chip-complete-border) !important;
-  color: var(--ika-chip-complete-text) !important;
+/* Explicitly protect global header / nav from dark background */
+body.ika-fd-layout--workspace header,
+body.ika-fd-layout--workspace .site-header,
+body.ika-fd-layout--workspace .elementor-location-header,
+body.ika-fd-layout--workspace .elementor-location-header * {
+    background: transparent !important;
 }
 
-/* LOCKED uses NEW token for now (same visual language as "not yet") */
-.ika-rec-card[data-state="locked"]::after,
-.ika-rec-card--state-locked::after{
-  background: var(--ika-chip-new-bg) !important;
-  border: 1px solid var(--ika-chip-new-border) !important;
-  color: var(--ika-chip-new-text) !important;
-  opacity: .92;
-}
-/* Recs: state chip (NEW / IN PROGRESS / COMPLETED) */
-.ika-scope-flightdeck .ika-rec-card[data-state]::after,
-.ika-scope-flightdeck .ika-rec-card[class*="ika-rec-card--state-"]::after,
-.ika-rec-card[data-state]::after,
-.ika-rec-card[class*="ika-rec-card--state-"]::after{
-  border-radius: 999px !important;
-  overflow: hidden !important;
-}
 
-/* Missions: state chip (not started / in progress / completed) */
-.ika-scope-flightdeck .ika-dm-card-state,
-.ika-dm-card-state{
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 999px !important;
-  padding: 6px 10px !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-}
+/* ==========================================================
+   B5: Badges page back-link typography alignment
+   Ensure matches Flight Deck hub section-link sizing
+   (EOF override, high-specificity)
+   ========================================================== */
 
-/* =========================================================
-   CHIP SHAPE HARDENING - Flight Deck Recs + Missions (EOF)
-   Purpose:
-   - Prevent regressions where chips render as square/rect blocks.
-   - Enforce platform pill geometry for:
-       * Recs type chip (.ika-rec-card__type)
-       * Recs state chip (::after)
-       * Mission state chip (.ika-dm-card-state)
-   Notes:
-   - EOF placement + !important wins the cascade safely.
-   ========================================================= */
-
-/* Recs: type chip (QUIZ / BRIEFING / COURSE) */
-.ika-rec-card__type{
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 999px !important;
-  padding: 6px 10px !important;
-}
-
-/* Recs: state chip (NEW / IN PROGRESS / COMPLETED) */
-.ika-rec-card[data-state]::after,
-.ika-rec-card[class*="ika-rec-card--state-"]::after{
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 999px !important;
-  height: 22px !important;
-  padding: 0 10px !important;
-}
-
-/* Missions: state chip (Not started / In progress / Completed) */
-.ika-dm-card-state,
-.ika-fd-missions-preview .ika-dm-card-state{
-  display: inline-flex !important;
-  align-items: center !important;
-  border-radius: 999px !important;
-  padding: 6px 10px !important;
-  line-height: 1 !important;
-}
-
-/* =========================================================
-   FLIGHT DECK LAYOUT TOKENS (Hub vs Workspace)
-   Enforced by body classes added in the gamification plugin:
-     - ika-fd-layout--hub
-     - ika-fd-layout--workspace
-   ========================================================= */
-
-/* Workspace sub-pages (e.g., /flight-deck/badges/) should feel like a full
-   dark console, not a framed panel inside a light page background. */
-body.ika-fd-layout--workspace{
-  background: #0D131F !important;
-}
-
-/* Neutralize common theme wrappers that can force a light background behind
-   full-dark Flight Deck sub-pages. (Safe no-ops if selectors don't exist.) */
-body.ika-fd-layout--workspace #page,
-body.ika-fd-layout--workspace .site,
-body.ika-fd-layout--workspace #content,
-body.ika-fd-layout--workspace .site-content,
-body.ika-fd-layout--workspace .elementor-location-single,
-body.ika-fd-layout--workspace .elementor-location-archive{
-  background: transparent !important;
+.ika-scope-flightdeck.ika-fd--badges a.ika-fd-back-link,
+.ika-scope-flightdeck.ika-fd--badges .ika-fd-back-link {
+  font-size: var(--ika-section-link-size, 15px) !important;
+  font-weight: var(--ika-section-link-weight, 600) !important;
+  line-height: 1.2;
 }

@@ -61,6 +61,86 @@ if ( ! function_exists( 'ika_fd_watuproplay_table_exists' ) ) {
     }
 }
 
+if ( ! function_exists( 'ika_fd_watuproplay_table_columns' ) ) {
+    /**
+     * Return column names for the WatuPRO Play levels table.
+     *
+     * @return string[]
+     */
+    function ika_fd_watuproplay_table_columns() : array {
+        static $cols = null;
+        if ( is_array( $cols ) ) return $cols;
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'watuproplay_levels';
+        $raw = $wpdb->get_results( "SHOW COLUMNS FROM {$table}", ARRAY_A );
+        $cols = [];
+        foreach ( (array) $raw as $r ) {
+            if ( ! empty( $r['Field'] ) ) $cols[] = (string) $r['Field'];
+        }
+        return $cols;
+    }
+}
+
+if ( ! function_exists( 'ika_fd_watuproplay_has_col' ) ) {
+    function ika_fd_watuproplay_has_col( string $col ) : bool {
+        $cols = ika_fd_watuproplay_table_columns();
+        $lc = array_map( 'strtolower', $cols );
+        return in_array( strtolower( $col ), $lc, true );
+    }
+}
+
+if ( ! function_exists( 'ika_fd_watuproplay_guess_icon_from_row' ) ) {
+    /**
+     * Best-effort icon URL extraction.
+     * Tries: explicit columns (image/icon/etc), then content <img>.
+     */
+    function ika_fd_watuproplay_guess_icon_from_row( array $row ) : string {
+        $candidates = [ 'image', 'image_url', 'img', 'icon', 'icon_url', 'badge_image', 'picture', 'thumb', 'thumbnail' ];
+
+        foreach ( $candidates as $k ) {
+            if ( empty( $row[ $k ] ) ) continue;
+            $v = trim( (string) $row[ $k ] );
+            if ( $v === '' ) continue;
+
+            // Attachment ID.
+            if ( ctype_digit( $v ) && (int) $v > 0 ) {
+                $u = wp_get_attachment_url( (int) $v );
+                if ( $u ) return (string) $u;
+            }
+
+            // Full URL.
+            if ( preg_match( '#^https?://#i', $v ) ) {
+                return $v;
+            }
+
+            // Absolute path from site root.
+            if ( strpos( $v, '/' ) === 0 ) {
+                return home_url( $v );
+            }
+
+            // Relative-ish path.
+            if ( strpos( $v, 'uploads/' ) !== false ) {
+                return content_url( '/' . ltrim( $v, '/' ) );
+            }
+        }
+
+        $content = ! empty( $row['content'] ) ? (string) $row['content'] : '';
+        if ( $content ) {
+            if ( function_exists( 'ika_watuproplay_extract_image_url' ) ) {
+                $u = (string) ika_watuproplay_extract_image_url( $content );
+                if ( $u ) return $u;
+            }
+            if ( function_exists( 'ika_fd_extract_img_src' ) ) {
+                $u = (string) ika_fd_extract_img_src( $content );
+                if ( $u ) return $u;
+            }
+        }
+
+        return '';
+    }
+}
+
 if ( ! function_exists( 'ika_fd_watuproplay_fetch_awards' ) ) {
     /**
      * Fetch WatuPRO Play awards (levels + badges) with extracted icon URL.
@@ -74,10 +154,15 @@ if ( ! function_exists( 'ika_fd_watuproplay_fetch_awards' ) ) {
         }
 
         $table = $wpdb->prefix . 'watuproplay_levels';
-        $rows = $wpdb->get_results(
-            "SELECT id, name, atype, content FROM {$table} WHERE atype IN ('level','badge')",
-            ARRAY_A
-        );
+        // Select additional columns if present (some installs store icon/image separately).
+        $select = [ 'id', 'name', 'atype', 'content' ];
+        foreach ( [ 'image', 'image_url', 'img', 'icon', 'icon_url', 'badge_image', 'picture', 'thumb', 'thumbnail' ] as $maybe ) {
+            if ( function_exists( 'ika_fd_watuproplay_has_col' ) && ika_fd_watuproplay_has_col( $maybe ) ) {
+                $select[] = $maybe;
+            }
+        }
+        $sql = 'SELECT ' . implode( ',', array_unique( $select ) ) . " FROM {$table} WHERE atype IN ('level','badge')";
+        $rows = $wpdb->get_results( $sql, ARRAY_A );
         if ( ! $rows ) return [];
 
         $out = [];
@@ -88,7 +173,14 @@ if ( ! function_exists( 'ika_fd_watuproplay_fetch_awards' ) ) {
             $id      = (int) ( $r['id'] ?? 0 );
             if ( $id <= 0 || $name === '' || $atype === '' ) continue;
 
-            $icon = $content ? ika_fd_extract_img_src( $content ) : '';
+            // Best-effort icon detection.
+            $icon = '';
+            if ( function_exists( 'ika_fd_watuproplay_guess_icon_from_row' ) ) {
+                $icon = ika_fd_watuproplay_guess_icon_from_row( $r );
+            }
+            if ( ! $icon && $content ) {
+                $icon = ika_fd_extract_img_src( $content );
+            }
             $out[] = [
                 'id'   => $id,
                 'atype'=> $atype,
@@ -141,29 +233,364 @@ if ( ! function_exists( 'ika_fd_icon_for_badge_title' ) ) {
     }
 }
 
+/* ----------------------------------------------------------------------
+ * Earned detection helpers (Badges)
+ *
+ * Contracted key (B5.1):
+ *   ika_badge_earned_{id}
+ *
+ * Some WatuPRO Play installs record earned awards in a per-user table.
+ * This helper checks both the contracted usermeta flag and common WatuPRO Play
+ * user-award tables (auto-detected) so "earned" previews work out of the box.
+ * ---------------------------------------------------------------------- */
+
+if ( ! function_exists( 'ika_fd_watuproplay_find_user_awards_table' ) ) {
+    /**
+     * Try to locate a WatuPRO Play per-user awards table and its award id column.
+     *
+     * @return array|null [ 'table' => string, 'award_col' => string, 'user_col' => string ]
+     */
+    function ika_fd_watuproplay_find_user_awards_table() {
+        static $found = null;
+        static $did_scan = false;
+
+        if ( $did_scan ) return $found;
+        $did_scan = true;
+
+        global $wpdb;
+
+        // Pull candidate tables and pick the first that matches expected columns.
+        $like = $wpdb->esc_like( $wpdb->prefix . 'watuproplay_' ) . '%';
+        $tables = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $like ) );
+        if ( ! is_array( $tables ) || empty( $tables ) ) {
+            $found = null;
+            return $found;
+        }
+
+        // Prefer tables that include "user" and "level" (badges are stored as levels rows with atype=badge).
+        usort( $tables, function( $a, $b ) {
+            $aa = ( stripos( $a, 'user' ) !== false && stripos( $a, 'level' ) !== false ) ? 0 : 1;
+            $bb = ( stripos( $b, 'user' ) !== false && stripos( $b, 'level' ) !== false ) ? 0 : 1;
+            return $aa <=> $bb;
+        } );
+
+        $award_cols = [ 'level_id', 'badge_id', 'award_id', 'item_id' ];
+        $user_cols  = [ 'user_id', 'userid', 'wp_user_id' ];
+
+        foreach ( $tables as $t ) {
+            $lt = strtolower( (string) $t );
+            if ( strpos( $lt, 'watuproplay_' ) === false ) continue;
+            if ( strpos( $lt, 'user' ) === false ) continue;
+
+            $cols = $wpdb->get_col( "SHOW COLUMNS FROM {$t}", 0 );
+            if ( ! is_array( $cols ) || empty( $cols ) ) continue;
+
+            $cols_lc = array_map( 'strtolower', $cols );
+
+            $user_col = '';
+            foreach ( $user_cols as $uc ) {
+                $idx = array_search( $uc, $cols_lc, true );
+                if ( $idx !== false ) { $user_col = $cols[ $idx ]; break; }
+            }
+            if ( $user_col === '' ) continue;
+
+            $award_col = '';
+            foreach ( $award_cols as $ac ) {
+                $idx = array_search( $ac, $cols_lc, true );
+                if ( $idx !== false ) { $award_col = $cols[ $idx ]; break; }
+            }
+            if ( $award_col === '' ) continue;
+
+            $found = [
+                'table'     => $t,
+                'award_col' => $award_col,
+                'user_col'  => $user_col,
+            ];
+            return $found;
+        }
+
+        $found = null;
+        return $found;
+    }
+}
+
+if ( ! function_exists( 'ika_fd_user_has_badge_earned' ) ) {
+    /**
+     * Determine whether the user has earned a given badge id.
+     *
+     * First checks contracted usermeta flag, then falls back to a WatuPRO Play
+     * per-user awards table if present.
+     */
+    function ika_fd_user_has_badge_earned( int $user_id, int $badge_id ) : bool {
+        if ( $user_id <= 0 || $badge_id <= 0 ) return false;
+
+        $meta_key = 'ika_badge_earned_' . $badge_id;
+        $earned_flag = get_user_meta( $user_id, $meta_key, true );
+        if ( ! empty( $earned_flag ) ) {
+            return true;
+        }
+
+        $info = ika_fd_watuproplay_find_user_awards_table();
+        if ( empty( $info['table'] ) || empty( $info['award_col'] ) || empty( $info['user_col'] ) ) {
+            return false;
+        }
+
+        global $wpdb;
+        $table = $info['table'];
+        $user_col = $info['user_col'];
+        $award_col = $info['award_col'];
+
+        $sql = "SELECT 1 FROM {$table} WHERE {$user_col} = %d AND {$award_col} = %d LIMIT 1";
+        $hit = $wpdb->get_var( $wpdb->prepare( $sql, $user_id, $badge_id ) );
+        if ( ! empty( $hit ) ) {
+            // Backfill the contracted flag for faster subsequent reads.
+            update_user_meta( $user_id, $meta_key, 1 );
+            return true;
+        }
+
+        return false;
+    }
+}
+
+
+/* ----------------------------------------------------------------------
+ * Flight Deck – Levels Summary (Dashboard)
+ *
+ * Shortcode:
+ *   [ika_fd_levels_preview]
+ *
+ * Purpose:
+ * - Renders the "Levels" summary module on the Flight Deck hub.
+ * - Uses the canonical XP ladder (ika_get_rank_ladder).
+ * - Icons are sourced from WatuPRO Play "level" rows when available.
+ * - Links to /flight-deck/badges/ (full Levels + Badges workspace).
+ * ---------------------------------------------------------------------- */
+
+add_shortcode( 'ika_fd_levels_preview', function( $atts ) {
+
+    $levels_url = home_url( '/flight-deck/badges/' );
+
+    ob_start();
+    ?>
+    <div class="ika-fd-levels-preview">
+        <div class="ika-hub-section-head">
+            <div class="ika-hub-section-head__text">
+                <h2 class="ika-hub-section-title">Levels</h2>
+                <p class="ika-hub-section-kicker">Your progression ranks, unlocked as you earn XP.</p>
+            </div>
+            <a class="ika-hub-section-link" href="<?php echo esc_url( $levels_url ); ?>">View all levels &rarr;</a>
+        </div>
+
+        <?php if ( ! is_user_logged_in() ) : ?>
+            <div class="ika-fd-badges-empty">
+                <div class="ika-fd-badges-empty__title">Log in to view your level</div>
+                <div class="ika-fd-badges-empty__meta">Your progression will appear here once you’re signed in.</div>
+            </div>
+        <?php else : ?>
+            <?php
+                $user_id = get_current_user_id();
+                $xp      = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+
+                $icon_map = function_exists( 'ika_fd_watuproplay_icon_map' ) ? ika_fd_watuproplay_icon_map() : [];
+
+                $ladder = function_exists( 'ika_get_rank_ladder' ) ? ika_get_rank_ladder() : [];
+                usort( $ladder, function( $a, $b ) {
+                    return (int) ( $a['min_xp'] ?? 0 ) <=> (int) ( $b['min_xp'] ?? 0 );
+                } );
+
+                $items = [];
+                foreach ( (array) $ladder as $step ) {
+                    $label  = (string) ( $step['label'] ?? '' );
+                    $min_xp = (int) ( $step['min_xp'] ?? 0 );
+                    if ( $label === '' ) continue;
+
+                    $state = ( $xp >= $min_xp ) ? 'earned' : 'locked';
+                    $chip  = ( $state === 'earned' ) ? 'Earned' : 'Locked';
+                    $icon  = ( ! empty( $icon_map ) ) ? ika_fd_icon_for_badge_title( $label, $icon_map ) : '';
+
+                    $items[] = [
+                        'title'    => $label,
+                        'state'    => $state,
+                        'chip'     => $chip,
+                        'icon_src' => $icon,
+                        'meta'     => $min_xp . ' XP',
+                    ];
+                }
+            ?>
+
+            <div class="ika-fd-badges-grid ika-fd-badges-grid--full">
+                <?php foreach ( $items as $b ) :
+                    $state = (string) ( $b['state'] ?? 'locked' );
+                    $chip  = (string) ( $b['chip'] ?? 'Locked' );
+                    $meta  = (string) ( $b['meta'] ?? '' );
+                    $icon  = (string) ( $b['icon_src'] ?? '' );
+                ?>
+                    <a class="ika-fd-badge-card ika-fd-badge-card--state-<?php echo esc_attr( $state ); ?>"
+                       data-state="<?php echo esc_attr( $state ); ?>"
+                       href="<?php echo esc_url( $levels_url ); ?>">
+                        <div class="ika-fd-badge-icon" aria-hidden="true">
+                            <?php if ( $icon ) : ?>
+                                <img class="ika-fd-badge-icon__img" src="<?php echo esc_url( $icon ); ?>" alt="" loading="lazy" decoding="async" />
+                            <?php endif; ?>
+                        </div>
+                        <div class="ika-fd-badge-title"><?php echo esc_html( (string) $b['title'] ); ?></div>
+                        <span class="ika-fd-badge-chip"><?php echo esc_html( $chip ); ?></span>
+                        <?php if ( $meta ) : ?>
+                            <div class="ika-fd-badge-sub"><?php echo esc_html( $meta ); ?></div>
+                        <?php endif; ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
+    return ob_get_clean();
+} );
+
+
+/* ----------------------------------------------------------------------
+ * Flight Deck – Badges Summary (Dashboard) — Phase B5.1
+ *
+ * Shortcode:
+ *   [ika_fd_badges_preview]
+ *
+ * Locked behavior:
+ * - Earned badges only (atype='badge')
+ * - Max 5 tiles; if more earned exist, show a "+X more" tile
+ * - Mini tiles (icon + title only; no chips)
+ * - Tiles link to /flight-deck/badges/
+ */
+
+if ( ! function_exists( 'ika_fd_get_badges_preview_data' ) ) {
+    /**
+     * Data contract for the Flight Deck badges summary module.
+     *
+     * @param int $user_id
+     * @param int $max_tiles
+     * @return array
+     */
+    function ika_fd_get_badges_preview_data( int $user_id, int $max_tiles = 5 ) : array {
+        static $cache = [];
+
+        $max_tiles = max( 1, min( 5, (int) $max_tiles ) );
+
+        $ck = $user_id . ':' . $max_tiles;
+        if ( isset( $cache[ $ck ] ) ) {
+            return $cache[ $ck ];
+        }
+
+        $badges_url = home_url( '/flight-deck/badges/' );
+
+        $data = [
+            'earned_count'       => 0,
+            'total_badges_count' => 0,
+            'items'              => [],
+            'more_count'         => 0,
+        ];
+
+        if ( $user_id <= 0 ) {
+            $cache[ $ck ] = $data;
+            return $cache[ $ck ];
+        }
+
+        if ( ! function_exists( 'ika_fd_watuproplay_table_exists' ) || ! ika_fd_watuproplay_table_exists() ) {
+            $cache[ $ck ] = $data;
+            return $cache[ $ck ];
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'watuproplay_levels';
+
+        // Ordering: id DESC (future-ready for timestamps).
+        // Pull badge rows; include extra icon/image columns when present.
+        $select = [ 'id', 'name', 'content' ];
+        foreach ( [ 'image', 'image_url', 'img', 'icon', 'icon_url', 'badge_image', 'picture', 'thumb', 'thumbnail' ] as $maybe ) {
+            if ( function_exists( 'ika_fd_watuproplay_has_col' ) && ika_fd_watuproplay_has_col( $maybe ) ) {
+                $select[] = $maybe;
+            }
+        }
+        $sql = 'SELECT ' . implode( ',', array_unique( $select ) ) . " FROM {$table} WHERE atype = 'badge' ORDER BY id DESC";
+
+        $rows = $wpdb->get_results( $sql, ARRAY_A );
+
+        if ( ! is_array( $rows ) ) {
+            $rows = [];
+        }
+
+        $data['total_badges_count'] = count( $rows );
+
+        $earned = [];
+        foreach ( $rows as $r ) {
+            $id    = (int) ( $r['id'] ?? 0 );
+            $title = (string) ( $r['name'] ?? '' );
+            if ( $id <= 0 || $title === '' ) continue;
+
+            // Earned-only: detect via contracted usermeta flag, with a WatuPRO Play
+            // per-user awards table fallback.
+            $is_earned = function_exists( 'ika_fd_user_has_badge_earned' )
+                ? ika_fd_user_has_badge_earned( $user_id, $id )
+                : (bool) get_user_meta( $user_id, 'ika_badge_earned_' . $id, true );
+            if ( ! $is_earned ) continue;
+
+            // Icon/image: try explicit columns first, then content <img>.
+            $img_url = '';
+            if ( function_exists( 'ika_fd_watuproplay_guess_icon_from_row' ) ) {
+                $img_url = (string) ika_fd_watuproplay_guess_icon_from_row( $r );
+            }
+            if ( ! $img_url ) {
+                $content = (string) ( $r['content'] ?? '' );
+                if ( function_exists( 'ika_watuproplay_extract_image_url' ) ) {
+                    $img_url = (string) ika_watuproplay_extract_image_url( $content );
+                } elseif ( function_exists( 'ika_fd_extract_img_src' ) ) {
+                    $img_url = (string) ika_fd_extract_img_src( $content );
+                }
+            }
+
+            $earned[] = [
+                'id'      => $id,
+                'title'   => $title,
+                'img_url' => $img_url,
+                'href'    => $badges_url,
+            ];
+        }
+
+        $data['earned_count'] = count( $earned );
+
+        $items = array_slice( $earned, 0, $max_tiles );
+        $data['items'] = $items;
+
+        $data['more_count'] = max( 0, $data['earned_count'] - count( $items ) );
+
+        $cache[ $ck ] = $data;
+        return $cache[ $ck ];
+    }
+}
+
+
 add_shortcode( 'ika_fd_badges_preview', function( $atts ) {
 
     $atts = shortcode_atts(
         [
-            'limit' => 6,
+            // Locked to 5, but allow safe override for debugging.
+            'max' => 5,
         ],
         (array) $atts,
         'ika_fd_badges_preview'
     );
 
-    $limit = (int) $atts['limit'];
-    if ( $limit < 1 ) $limit = 1;
-    if ( $limit > 12 ) $limit = 12;
+    $max_tiles = (int) $atts['max'];
+    if ( $max_tiles < 1 ) $max_tiles = 1;
+    if ( $max_tiles > 5 ) $max_tiles = 5;
 
     $badges_url = home_url( '/flight-deck/badges/' );
 
     ob_start();
     ?>
-    <div class="ika-fd-badges-preview">
+    <div class="ika-fd-badges-preview ika-fd-badges-preview--mini">
         <div class="ika-hub-section-head">
             <div class="ika-hub-section-head__text">
                 <h2 class="ika-hub-section-title">Badges &amp; Achievements</h2>
-                <p class="ika-hub-section-kicker">A quick snapshot of what you’ve earned recently.</p>
+                <p class="ika-hub-section-kicker">Your earned badges — right on the dashboard.</p>
             </div>
             <a class="ika-hub-section-link" href="<?php echo esc_url( $badges_url ); ?>">View all badges &rarr;</a>
         </div>
@@ -175,83 +602,60 @@ add_shortcode( 'ika_fd_badges_preview', function( $atts ) {
             </div>
         <?php else : ?>
             <?php
-            // Phase 1 placeholders: we’ll replace with Watu Play earned/locked badges later.
-            // However, we *can* pull icon images from WatuPRO Play "levels" records now.
-            $icon_map = ika_fd_watuproplay_icon_map();
-            $user_id = get_current_user_id();
-            $xp = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+                $user_id = get_current_user_id();
+                $data    = function_exists( 'ika_fd_get_badges_preview_data' ) ? ika_fd_get_badges_preview_data( $user_id, $max_tiles ) : [
+                    'earned_count'       => 0,
+                    'total_badges_count' => 0,
+                    'items'              => [],
+                    'more_count'         => 0,
+                ];
 
-            $ladder = function_exists( 'ika_get_rank_ladder' ) ? ika_get_rank_ladder() : [];
-            // Ensure ascending by min_xp.
-            usort( $ladder, function( $a, $b ) {
-                return (int) ($a['min_xp'] ?? 0) <=> (int) ($b['min_xp'] ?? 0);
-            });
-
-            $earned = [];
-            $locked = [];
-
-            foreach ( (array) $ladder as $r ) {
-                $label = isset( $r['label'] ) ? (string) $r['label'] : '';
-                $min_xp = isset( $r['min_xp'] ) ? (int) $r['min_xp'] : 0;
-                if ( $label === '' ) continue;
-
-                if ( $xp >= $min_xp ) {
-                    $earned[] = [
-                        'title' => $label,
-                        'state' => 'earned',
-                        'chip'  => 'Earned',
-                    ];
-                } else {
-                    $locked[] = [
-                        'title' => $label,
-                        'state' => 'locked',
-                        'chip'  => 'Locked',
-                    ];
-                }
-            }
-
-            // Show a balanced slice: recent earned first, then upcoming locked.
-            $items = [];
-
-            $earned_slice = array_slice( array_reverse( $earned ), 0, (int) ceil( $limit / 2 ) );
-            foreach ( $earned_slice as $e ) $items[] = $e;
-
-            foreach ( $locked as $l ) {
-                if ( count( $items ) >= $limit ) break;
-                $items[] = $l;
-            }
-
-            // If user has no earned ranks yet, just show the first few locked.
-            if ( empty( $items ) ) {
-                $items = array_slice( $locked, 0, $limit );
-            }
-            $items = array_slice( $items, 0, $limit );
+                $items      = isset( $data['items'] ) && is_array( $data['items'] ) ? $data['items'] : [];
+                $more_count = isset( $data['more_count'] ) ? (int) $data['more_count'] : 0;
             ?>
-            <div class="ika-fd-badges-grid">
-                <?php foreach ( $items as $b ) :
-                    $state = isset( $b['state'] ) ? (string) $b['state'] : 'locked';
-                    $chip  = isset( $b['chip'] ) ? (string) $b['chip'] : 'Locked';
-                    $icon_src = ( ! empty( $icon_map ) ) ? ika_fd_icon_for_badge_title( (string) $b['title'], $icon_map ) : '';
-                ?>
-                    <a class="ika-fd-badge-card ika-fd-badge-card--state-<?php echo esc_attr( $state ); ?>"
-                       data-state="<?php echo esc_attr( $state ); ?>"
-                       href="<?php echo esc_url( $badges_url ); ?>">
-                        <div class="ika-fd-badge-icon" aria-hidden="true">
-                            <?php if ( $icon_src ) : ?>
-                                <img class="ika-fd-badge-icon__img" src="<?php echo esc_url( $icon_src ); ?>" alt="" loading="lazy" decoding="async" />
-                            <?php endif; ?>
-                        </div>
-                        <div class="ika-fd-badge-title"><?php echo esc_html( $b['title'] ); ?></div>
-                        <span class="ika-fd-badge-chip"><?php echo esc_html( $chip ); ?></span>
-                    </a>
-                <?php endforeach; ?>
-            </div>
+
+            <?php if ( empty( $items ) ) : ?>
+                <div class="ika-fd-badges-empty">
+                    <div class="ika-fd-badges-empty__title">No badges yet</div>
+                    <div class="ika-fd-badges-empty__meta">Complete quizzes and missions to start earning achievements.</div>
+                </div>
+            <?php else : ?>
+                <div class="ika-fd-badges-preview__subhead">
+                    <h3 class="ika-fd-badges-preview__title">Badges</h3>
+                </div>
+                <div class="ika-fd-badges-grid ika-fd-badges-grid--full">
+                    <?php foreach ( $items as $b ) :
+                        $title   = isset( $b['title'] ) ? (string) $b['title'] : '';
+                        $img_url = isset( $b['img_url'] ) ? (string) $b['img_url'] : '';
+                        $href    = isset( $b['href'] ) ? (string) $b['href'] : $badges_url;
+                    ?>
+                        <a class="ika-fd-badge-card" href="<?php echo esc_url( $href ); ?>">
+                            <div class="ika-fd-badge-icon" aria-hidden="true">
+                                <?php if ( $img_url ) : ?>
+                                    <img class="ika-fd-badge-icon__img" src="<?php echo esc_url( $img_url ); ?>" alt="" loading="lazy" decoding="async" />
+                                <?php else : ?>
+                                    <span class="ika-fd-badge-mini__fallback"></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="ika-fd-badge-title"><?php echo esc_html( $title ); ?></div>
+                        </a>
+                    <?php endforeach; ?>
+
+                    <?php if ( $more_count > 0 ) : ?>
+                        <a class="ika-fd-badge-card ika-fd-badge-card--more" href="<?php echo esc_url( $badges_url ); ?>">
+                            <div class="ika-fd-badge-icon" aria-hidden="true">
+                                <span class="ika-fd-badge-mini__more-count">+<?php echo esc_html( (string) $more_count ); ?></span>
+                            </div>
+                            <div class="ika-fd-badge-title">More</div>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
     <?php
     return ob_get_clean();
 } );
-
 
 /* ----------------------------------------------------------------------
  * Flight Deck – Badges Page (B5)
@@ -284,8 +688,9 @@ add_shortcode( 'ika_fd_badges_page', function( $atts ) {
     if ( function_exists( 'ika_fd_watuproplay_table_exists' ) && ika_fd_watuproplay_table_exists() ) {
         global $wpdb;
         $table = $wpdb->prefix . 'watuproplay_levels';
+        // Column is `id` (lowercase) in WatuPRO Play tables.
         $awards = $wpdb->get_results(
-            "SELECT ID, name, atype, content FROM {$table} WHERE atype IN ('level','badge')",
+            "SELECT id, name, atype, content FROM {$table} WHERE atype IN ('level','badge')",
             ARRAY_A
         );
     }
@@ -343,11 +748,13 @@ add_shortcode( 'ika_fd_badges_page', function( $atts ) {
 
     $badge_items = [];
     foreach ( $badges_rows as $r ) {
-        $id   = (int) ( $r['ID'] ?? 0 );
+        $id   = (int) ( $r['id'] ?? 0 );
         $name = (string) ( $r['name'] ?? '' );
         if ( $id < 1 || $name === '' ) continue;
 
-        $earned = (bool) get_user_meta( $user_id, 'ika_badge_earned_' . $id, true );
+        $earned = function_exists( 'ika_fd_user_has_badge_earned' )
+            ? ika_fd_user_has_badge_earned( $user_id, $id )
+            : (bool) get_user_meta( $user_id, 'ika_badge_earned_' . $id, true );
         $state  = $earned ? 'earned' : 'locked';
         $chip   = $earned ? 'Earned' : 'Locked';
 
