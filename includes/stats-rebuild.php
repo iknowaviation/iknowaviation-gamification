@@ -38,8 +38,11 @@ function ika_rebuild_stats_for_user( $user_id ) {
 		update_user_meta( $user_id, 'ika_avg_score', 0 );
 		update_user_meta( $user_id, 'ika_best_score', 0 );
 		update_user_meta( $user_id, 'ika_total_xp_quiz', 0 );
-	// Do not reset ika_total_xp_bonus here.
-	update_user_meta( $user_id, 'ika_total_xp', 0 );
+
+		// Preserve bonus XP (missions, promos, etc.) even if no attempts exist.
+		$bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+		$bonus_xp = max( 0, $bonus_xp );
+		update_user_meta( $user_id, 'ika_total_xp', $bonus_xp );
 		update_user_meta( $user_id, 'ika_current_streak_days', 0 );
 		update_user_meta( $user_id, 'ika_last_quiz_date', '' );
 		update_user_meta( $user_id, 'ika_last_quiz_timestamp', 0 );
@@ -50,7 +53,6 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	$unique_quiz_ids = array();
 	$score_sum       = 0.0;
 	$best_score      = 0.0;
-	$total_points    = 0;
 	$dates           = array();
 	$last_quiz_ts    = 0;
 	$last_quiz_date  = '';
@@ -65,9 +67,6 @@ function ika_rebuild_stats_for_user( $user_id ) {
 				$best_score = $score;
 			}
 		}
-
-		$pts          = isset( $row->points ) ? (int) $row->points : 0;
-		$total_points += $pts;
 
 		if ( ! empty( $row->end_time ) ) {
 			$dt = new DateTime( $row->end_time );
@@ -90,18 +89,31 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	update_user_meta( $user_id, 'ika_score_sum', $score_sum );
 	update_user_meta( $user_id, 'ika_avg_score', $avg_score );
 	update_user_meta( $user_id, 'ika_best_score', $best_score );
-	update_user_meta( $user_id, 'ika_total_xp_quiz', $total_points );
+
+	// --- Quiz XP is now IKA-owned and stored in the XP Ledger (not Watu "points") ---
+	$quiz_xp_total = 0;
+	if ( function_exists( 'ika_xp_ledger_table' ) ) {
+		$ledger_table = ika_xp_ledger_table();
+		$quiz_xp_total = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(xp),0) FROM {$ledger_table} WHERE user_id = %d AND source = %s",
+			$user_id,
+			'quiz_attempt'
+		) );
+	}
+
+	update_user_meta( $user_id, 'ika_total_xp_quiz', $quiz_xp_total );
 
 	// Preserve bonus XP (missions, promos, etc.)
 	$bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
 	$bonus_xp = max( 0, $bonus_xp );
-	update_user_meta( $user_id, 'ika_total_xp', (int) $total_points + $bonus_xp );
+	$total_xp = (int) $quiz_xp_total + $bonus_xp;
+	update_user_meta( $user_id, 'ika_total_xp', $total_xp );
 	update_user_meta( $user_id, 'ika_current_streak_days', $streak_days );
 	update_user_meta( $user_id, 'ika_last_quiz_date', $last_quiz_date );
 	update_user_meta( $user_id, 'ika_last_quiz_timestamp', $last_quiz_ts );
 
 	// Also update stored rank label/slug for convenience.
-	$rank = ika_get_rank_for_xp( $total_points );
+	$rank = ika_get_rank_for_xp( $total_xp );
 	update_user_meta( $user_id, 'ika_rank_slug',  $rank['slug'] );
 	update_user_meta( $user_id, 'ika_rank_label', $rank['label'] );
 }

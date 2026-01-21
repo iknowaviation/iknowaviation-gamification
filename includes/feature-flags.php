@@ -22,6 +22,12 @@ function ika_gam_feature_flags_defaults() {
         'leaderboard' => true,
         'missions'    => true,
         'watuplay'    => true,  // badges/levels modal + avatar sync logic lives here
+
+        // Phase 1: IKA-controlled modal rendering for WatuPlay-earned badges/levels.
+        // When enabled, the plugin captures earned items on quiz completion and renders a modal
+        // on the results page under our control (no reliance on WatuPlay's dialog output).
+        'watuplay_modal_bridge' => false,
+
         'admin_tools' => true,  // debug panel visibility
     );
 }

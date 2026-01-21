@@ -20,8 +20,8 @@ function ika_fd_get_rank_context( $user_id = 0 ) {
 		return null;
 	}
 
-	$xp     = floatval( get_user_meta( $user_id, 'ika_total_xp', true ) );
-	$ladder = ika_get_rank_ladder();
+	$xp      = floatval( get_user_meta( $user_id, 'ika_total_xp', true ) );
+	$ladder  = ika_get_rank_ladder();
 	$current = ika_get_rank_for_xp( $xp );
 	$next    = ika_get_next_rank_for_xp( $xp );
 
@@ -74,6 +74,17 @@ add_shortcode( 'ika_rank_title', function() {
 	$data = ika_get_user_xp_and_rank();
 	return $data ? esc_html( $data['rank_label'] ) : '';
 });
+
+/**
+ * [ika_total_xp]
+ * (This exists in other modules too, but leaving it here if already present in your build.)
+ */
+if ( ! shortcode_exists( 'ika_total_xp' ) ) {
+	add_shortcode( 'ika_total_xp', function() {
+		if ( ! is_user_logged_in() ) return '0';
+		return (string) intval( get_user_meta( get_current_user_id(), 'ika_total_xp', true ) );
+	});
+}
 
 /**
  * [ika_rank_position] → "Rank 3 of 8"
@@ -132,4 +143,26 @@ add_shortcode( 'ika_xp_level_goal', function() {
 	$ctx = ika_fd_get_rank_context();
 	if ( ! $ctx ) return '0';
 	return intval( $ctx['level_xp_goal'] );
+});
+
+/**
+ * ✅ NEW: [ika_next_rank_progress]
+ * Compact next-rank progress text for Results UI.
+ */
+add_shortcode( 'ika_next_rank_progress', function() {
+	$ctx = ika_fd_get_rank_context();
+	if ( ! $ctx ) {
+		return '';
+	}
+
+	// If user is at top rank.
+	if ( empty( $ctx['next_label'] ) ) {
+		return esc_html( 'Top Rank Achieved!' );
+	}
+
+	$percent = isset( $ctx['percent_level'] ) ? (int) $ctx['percent_level'] : 0;
+	$to_next = isset( $ctx['xp_to_next'] ) ? (int) $ctx['xp_to_next'] : 0;
+	$next    = (string) $ctx['next_label'];
+
+	return esc_html( sprintf( '%d%% to %s (%d XP remaining)', $percent, $next, $to_next ) );
 });

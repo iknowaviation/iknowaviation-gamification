@@ -39,10 +39,14 @@ if ( ! function_exists( 'ika_gam_safe_require' ) ) {
  * Core modules (always-on)
  */
 ika_gam_safe_require( 'includes/ranks-xp-core.php' );
+ika_gam_safe_require( 'includes/xp-ledger.php' );
 ika_gam_safe_require( 'includes/stats-rebuild.php' );
 ika_gam_safe_require( 'includes/quiz-taxonomies.php' );
 ika_gam_safe_require( 'includes/tools/class-ika-recommendations-v7.php' );
 ika_gam_safe_require( 'includes/quiz-wrapper.php' );
+// WatuPRO Quiz/Results shell templates (shortcodes)
+ika_gam_safe_require( 'includes/watupro-templates-shortcodes.php' );
+ika_gam_safe_require( 'includes/results-next-actions-shortcode.php' );
 ika_gam_safe_require( 'includes/frontend-deps.php' );
 
 /**

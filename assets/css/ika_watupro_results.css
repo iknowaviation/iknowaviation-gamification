@@ -104,7 +104,7 @@ body.single-quiz .elementor-640 .elementor-element-0d1d4aa{
   border-bottom:1px solid #13243e;
 }
 .ika-share-label{
-  font-size:13px;
+  font-size: 15px;
   font-weight:600;
   color:#c1d4ff;
 }
@@ -121,6 +121,54 @@ body.single-quiz .elementor-640 .elementor-element-0d1d4aa{
 .ika-next-steps ul{
   margin:6px 0 0 1.2em;
   padding-left:0;
+}
+
+/* ============ RESULTS: NEXT ACTIONS (NEW) ============ */
+.ika-results-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin:6px 0 18px;
+}
+.ika-action-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:9px 16px;
+  border-radius:999px;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  text-decoration:none;
+  color:#eaf2ff;
+  background:#07152b;
+  border:1px solid #18355c;
+  transition:transform .12s ease, background .15s ease, box-shadow .15s ease;
+}
+.ika-action-pill:hover{
+  background:#0a1b37;
+  transform:translateY(-1px);
+  box-shadow:0 10px 22px rgba(15,23,42,.25);
+}
+.ika-action-pill:focus{
+  outline:2px solid rgba(143,211,255,.55);
+  outline-offset:2px;
+}
+
+/* ============ RESULTS: MOBILE PASS (TARGETED) ============ */
+@media (max-width: 900px){
+  .ika-results-main{ padding:18px 16px 18px; }
+  .ika-stats-grid{ grid-template-columns:1fr; gap:12px; }
+  .ika-stat-card{ padding:14px 14px; }
+  .ika-stat-value{ font-size:20px; }
+  .ika-results-actions{ margin:2px 0 16px; }
+  .ika-action-pill{ width:100%; justify-content:center; }
+}
+
+@media (max-width: 420px){
+  .ika-stat-value{ font-size:19px; }
+  .ika-action-pill{ padding:10px 14px; font-size:12px; }
 }
 
 /* Style "Take another quiz" link as primary button */
@@ -300,4 +348,1027 @@ body.single-quiz .elementor-640 .elementor-element-0d1d4aa{
   background:rgba(255,255,255,.06);
   border:1px solid rgba(255,255,255,.12);
   color:rgba(255,255,255,.80);
+}
+/* =========================================================
+   IKA Results – Answer Breakdown fixes (2026-01-18)
+   NOTE:
+   Ensure the %%ANSWERS%% wrapper lives INSIDE the results container.
+   If the answers HTML is outside .ika-results-page, these styles won't apply.
+   ========================================================= */
+
+/* Card wrapper for each resolved question */
+.ika-results-page .watupro-choices-columns.show-question{
+  background: rgba(13, 19, 31, 0.55);
+  border: 1px solid rgba(98, 169, 242, 0.20);
+  border-radius: 18px;
+  padding: 16px 16px 14px;
+  margin: 14px 0;
+}
+
+/* Question header */
+.ika-results-page .show-question-content{
+  margin-bottom: 10px;
+}
+
+.ika-results-page .show-question-content h3,
+.ika-results-page .show-question-content h3.ika-question-title{
+  margin: 0;
+  font-size: 22px !important;
+  line-height: 1.25;
+  font-style: italic !important;
+  font-weight: 700;
+}
+
+/* Choice list */
+.ika-results-page .show-question-choices ul{
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.ika-results-page .show-question-choices li.answer{
+  margin: 6px 0;
+}
+
+/* Align wrapped answer text */
+.ika-results-page .show-question-choices li.answer > .answer,
+.ika-results-page .show-question-choices li.answer span.answer{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Feedback/explanation */
+.ika-results-page .watupro-main-feedback{
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(26, 39, 64, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Remove stray <p> spacing Watu injects between blocks */
+.ika-results-page .watupro-choices-columns.show-question > p{
+  margin: 0;
+}
+
+/* =========================================================
+   IKA Results – Targeted fixes (APPENDED, 2026-01-18)
+   Purpose:
+   - Prevent Recommended Next cards from inheriting badge/avatar oval styles
+   Scope:
+   - Results page only (.ika-results-page)
+   Notes:
+   - Does NOT override grids, widths, or core card layout
+   ========================================================= */
+
+/* Neutralize badge/avatar masking on recommendation cards only */
+.ika-results-page .ika-next-steps [class*="rec"],
+.ika-results-page .ika-next-steps [class*="card"] {
+  border-radius: 18px !important;
+  overflow: hidden;
+}
+
+/* Remove forced square/circle constraints if inherited */
+.ika-results-page .ika-next-steps [style*="aspect-ratio"],
+.ika-results-page .ika-next-steps [style*="border-radius"] {
+  aspect-ratio: auto !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* Ensure images inside rec cards are not masked */
+.ika-results-page .ika-next-steps img {
+  border-radius: 0 !important;
+}
+
+/* =========================================================
+   IKA Results – Answer Breakdown polish + Rec card refinement (2026-01-18)
+   Addresses:
+   - Answer Breakdown header left padding
+   - Question text too large
+   - Explanation block styling (pill + spacing + readable font)
+   - Recommended Next cards: improve typography + prevent text clipping
+   Scoped to results page only.
+   ========================================================= */
+
+/* --- Answer Breakdown header spacing --- */
+.ika-results-page .ika-answer-section{
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+.ika-results-page .ika-answer-title,
+.ika-results-page .ika-answer-note{
+  max-width: 100%;
+}
+
+/* --- Question title sizing (Watu %%ANSWERS%%) --- */
+.ika-results-page .watupro-choices-columns.show-question .show-question-content h3,
+.ika-results-page .watupro-choices-columns.show-question .show-question-content h3.ika-question-title{
+  font-size: 18px !important;
+  line-height: 1.25 !important;
+  font-style: italic;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+}
+
+/* --- Explanation block (restore the good look) --- */
+.ika-results-page .watupro-main-feedback{
+  position: relative;
+  margin-top: 12px;
+  padding: 44px 16px 14px; /* top padding for pill */
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ika-results-page .watupro-main-feedback::before{
+  content: "EXPLANATION";
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.82);
+}
+
+/* If Watu injects an "EXPLANATION" label element, hide it to avoid duplicates */
+.ika-results-page .watupro-main-feedback .ika-expl-label,
+.ika-results-page .watupro-main-feedback .explanation-label{
+  display: none !important;
+}
+
+/* --- Recommended Next: typography + clipping fixes (results only) ---
+   We keep the card rounding, but allow inner content to lay out normally.
+*/
+.ika-results-page .ika-next-steps a{
+  border-radius: 18px;
+}
+
+/* Prevent inner wrappers from acting like masked badges */
+.ika-results-page .ika-next-steps a *{
+  aspect-ratio: auto !important;
+}
+
+/* Reduce overly large, shouty titles; allow wrapping */
+.ika-results-page .ika-next-steps [class*="title"],
+.ika-results-page .ika-next-steps [class*="Title"],
+.ika-results-page .ika-next-steps h3,
+.ika-results-page .ika-next-steps h4{
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  white-space: normal !important;
+  word-break: break-word;
+}
+
+/* Make meta text readable */
+.ika-results-page .ika-next-steps [class*="meta"],
+.ika-results-page .ika-next-steps [class*="Meta"],
+.ika-results-page .ika-next-steps [class*="sub"],
+.ika-results-page .ika-next-steps [class*="Sub"]{
+  font-size: 13px !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+}
+
+/* Don’t clip text inside the card body */
+.ika-results-page .ika-next-steps a [class*="content"],
+.ika-results-page .ika-next-steps a [class*="body"],
+.ika-results-page .ika-next-steps a [class*="Content"],
+.ika-results-page .ika-next-steps a [class*="Body"]{
+  overflow: visible !important;
+}
+
+/* Give cards a consistent height so they look balanced */
+.ika-results-page .ika-next-steps a{
+  min-height: 160px;
+}
+
+/* =========================================================
+   IKA Results – Micro fixes (2026-01-18)
+   - Add a bit more vertical space between EXPLANATION pill and text
+   - Properly style Recommended Next rail using real markup:
+     .ika-rec-rail / .ika-rec-rail__grid / .ika-rec-card*
+   Scoped to results page only.
+   ========================================================= */
+
+/* --- Explanation spacing: add a little more top padding --- */
+.ika-results-page .watupro-main-feedback{
+  padding-top: 54px; /* was 44px; creates more space under the pill */
+}
+
+/* --- Recommended Next rail (based on actual HTML) --- */
+.ika-results-page .ika-rec-rail{
+  margin-top: 18px;
+}
+
+.ika-results-page .ika-rec-rail__head{
+  margin-bottom: 10px;
+}
+
+.ika-results-page .ika-rec-rail__label{
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: none;
+}
+
+/* Grid layout (3-up desktop, 1-up mobile) */
+.ika-results-page .ika-rec-rail__grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 900px){
+  .ika-results-page .ika-rec-rail__grid{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card styling */
+.ika-results-page .ika-rec-card{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 16px;
+  border-radius: 18px;
+  text-decoration: none;
+  overflow: hidden;
+  min-height: 150px;
+}
+
+/* Prevent any inherited "badge circle" constraints */
+.ika-results-page .ika-rec-card,
+.ika-results-page .ika-rec-card *{
+  aspect-ratio: auto !important;
+}
+
+/* Type chip */
+.ika-results-page .ika-rec-card__type{
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+/* Title + meta */
+.ika-results-page .ika-rec-card__title{
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 2px 0 0;
+  word-break: break-word;
+}
+
+.ika-results-page .ika-rec-card__meta,
+.ika-results-page .ika-rec-card__why{
+  font-size: 13px;
+  line-height: 1.35;
+  opacity: .85;
+  word-break: break-word;
+}
+
+/* CTA pinned to bottom */
+.ika-results-page .ika-rec-card__cta{
+  margin-top: auto;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+/* State chips look (if present) */
+.ika-results-page .ika-rec-card[data-state="new"] .ika-rec-card__type{ opacity: .95; }
+.ika-results-page .ika-rec-card[data-state="in_progress"] .ika-rec-card__type{ opacity: .95; }
+.ika-results-page .ika-rec-card[data-state="unknown"] .ika-rec-card__type{ opacity: .95; }
+
+/* =========================================================
+   IKA Results – Recommended Next v7 (2026-01-19)
+   Based on actual markup:
+   .ika-next-steps .ika-rec-rail .ika-rec-rail__grid .ika-rec-card*
+   Goals:
+   - Remove dashed container
+   - Fix chip/pill styling (separate TYPE and STATE cleanly)
+   - Eliminate oval/circle masks that clip text
+   - Match Site-Wide Card Specs v1.0 look & feel
+   Scoped to results page only.
+   ========================================================= */
+
+/* ---- Rail container (no dashed border) ---- */
+.ika-results-page .ika-next-steps.ika-scope-recs{
+  margin-top: 16px;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail{
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(13, 19, 31, 0.40);
+  box-shadow: 0 10px 24px rgba(0,0,0,.22);
+}
+
+/* Header: bigger, clearer */
+.ika-results-page .ika-next-steps .ika-rec-rail__head{
+  margin-bottom: 10px;
+  padding: 2px 4px 8px;
+}
+.ika-results-page .ika-next-steps .ika-rec-rail__label{
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: rgba(255,255,255,.90);
+}
+
+/* Grid */
+.ika-results-page .ika-next-steps .ika-rec-rail__grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 900px){
+  .ika-results-page .ika-next-steps .ika-rec-rail__grid{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Card base (match IKA cards, not bright blue blocks) ---- */
+.ika-results-page .ika-next-steps a.ika-rec-card{
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 16px;
+  border-radius: 18px;
+  text-decoration: none;
+  overflow: hidden;
+  min-height: 158px;
+
+  background: rgba(26, 39, 64, 0.40);
+  border: 1px solid rgba(98, 169, 242, 0.20);
+  box-shadow: 0 10px 22px rgba(0,0,0,.22);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+}
+
+/* Hard-stop any inherited "badge circle" masking */
+.ika-results-page .ika-next-steps a.ika-rec-card,
+.ika-results-page .ika-next-steps a.ika-rec-card *{
+  aspect-ratio: auto !important;
+  width: auto;
+  height: auto;
+}
+.ika-results-page .ika-next-steps a.ika-rec-card *{
+  border-radius: 0;
+}
+
+/* Hover */
+.ika-results-page .ika-next-steps a.ika-rec-card:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(0,0,0,.28);
+  border-color: rgba(98, 169, 242, 0.30);
+  background: rgba(26, 39, 64, 0.50);
+}
+
+/* ---- Chips (TYPE left, STATE right) ---- */
+.ika-results-page .ika-next-steps .ika-rec-card__type{
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 999px !important;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.86);
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+/* State chip rendered on the card (top-right) */
+.ika-results-page .ika-next-steps a.ika-rec-card::after{
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.82);
+}
+
+/* State labels */
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="new"]::after{ content: "NEW"; }
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="in_progress"]::after{ content: "IN PROGRESS"; }
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="unknown"]::after{ content: "NEXT"; }
+
+/* State accents */
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="new"]{
+  border-color: rgba(98, 169, 242, 0.28);
+}
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="in_progress"]{
+  border-color: rgba(255, 211, 115, 0.22);
+}
+.ika-results-page .ika-next-steps a.ika-rec-card[data-state="unknown"]{
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* ---- Typography ---- */
+.ika-results-page .ika-next-steps .ika-rec-card__title{
+  margin: 2px 0 0;
+  font-size: 18px;
+  line-height: 1.15;
+  font-weight: 850;
+  letter-spacing: 0;
+  color: rgba(255,255,255,.95);
+  word-break: break-word;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__meta{
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(190, 210, 245, .92);
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__why{
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: rgba(170, 190, 225, .86);
+}
+
+/* ---- CTA (bottom) ---- */
+.ika-results-page .ika-next-steps .ika-rec-card__cta{
+  margin-top: auto;
+  padding-top: 10px;
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .02em;
+  color: rgba(255,255,255,.90);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__cta::after{
+  content: "→";
+  font-weight: 900;
+  opacity: .9;
+}
+
+/* Prevent any inner element from clipping text */
+.ika-results-page .ika-next-steps .ika-rec-card__title,
+.ika-results-page .ika-next-steps .ika-rec-card__meta,
+.ika-results-page .ika-next-steps .ika-rec-card__why,
+.ika-results-page .ika-next-steps .ika-rec-card__cta{
+  overflow: visible !important;
+}
+
+/* =========================================================
+   IKA Results – Recommended Next v8 refinements (2026-01-19)
+   - Remove any remaining dashed outlines/borders around the rail/cards
+   - Improve pill alignment (type left, state right, no overlap)
+   - Tone down typography weight (less bold)
+   - Improve internal text alignment/spacing
+   NOTE: Answers section untouched.
+   ========================================================= */
+
+/* Kill any dashed borders inherited from earlier experiments */
+.ika-results-page .ika-next-steps,
+.ika-results-page .ika-next-steps .ika-rec-rail,
+.ika-results-page .ika-next-steps .ika-rec-rail__grid{
+  border-style: solid !important;
+}
+
+.ika-results-page .ika-next-steps{
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+/* Rail container: ensure NO dashed/outline */
+.ika-results-page .ika-next-steps .ika-rec-rail{
+  border: 1px solid rgba(255,255,255,.10) !important;
+  outline: none !important;
+}
+
+/* Card: ensure no dashed outlines */
+.ika-results-page .ika-next-steps a.ika-rec-card{
+  outline: none !important;
+  border-style: solid !important;
+  text-align: left;
+}
+
+/* Pills: prevent overlap with top-right state chip */
+.ika-results-page .ika-next-steps .ika-rec-card__type{
+  margin-right: 92px; /* leaves room for state chip */
+  line-height: 1;
+}
+
+/* State chip: consistent sizing + alignment */
+.ika-results-page .ika-next-steps a.ika-rec-card::after{
+  top: 12px;
+  right: 12px;
+  line-height: 1;
+  padding: 5px 10px;
+}
+
+/* Tone down typography */
+.ika-results-page .ika-next-steps .ika-rec-card__title{
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__meta{
+  font-weight: 600;
+  opacity: .88;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__why{
+  font-weight: 500;
+  opacity: .78;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__cta{
+  font-weight: 700;
+  opacity: .92;
+}
+
+/* Spacing: keep title block compact and readable */
+.ika-results-page .ika-next-steps .ika-rec-card__title{
+  margin-top: 6px;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__meta{
+  margin-top: 2px;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__why{
+  margin-top: 6px;
+}
+
+/* Ensure chips sit on same visual row height */
+.ika-results-page .ika-next-steps .ika-rec-card__type{
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+}
+.ika-results-page .ika-next-steps a.ika-rec-card::after{
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+}
+
+/* CTA alignment: keep at bottom-left */
+.ika-results-page .ika-next-steps .ika-rec-card__cta{
+  justify-content: flex-start;
+}
+
+/* =========================================================
+   IKA Results – Recommended Next v9 (Match Flight Deck Cards)
+   Goal: make results rec cards visually identical to Flight Deck rec cards.
+   Based on identical markup:
+   - Flight Deck grid: .ika-rec-rail__grid with .ika-rec-card children fileciteturn19file0
+   - Results grid: same classes within .ika-next-steps fileciteturn19file1
+   Strategy:
+   - Remove the "frame" look (thick border / inner outline)
+   - Reduce card height (less padding, slightly smaller title)
+   - Rework chips to match FD: type chip left, state chip right, subtle, same baseline
+   - Keep scope to results page only so Flight Deck remains the source of truth.
+   ========================================================= */
+
+/* 1) Remove any remaining outer "frame" effect around the card group */
+.ika-results-page .ika-next-steps .ika-rec-rail{
+  border: 1px solid rgba(255,255,255,.10) !important;
+  box-shadow: 0 10px 24px rgba(0,0,0,.20);
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail__grid{
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+/* If any theme/plugin is drawing an inset outline, kill it */
+.ika-results-page .ika-next-steps .ika-rec-rail__grid::before,
+.ika-results-page .ika-next-steps .ika-rec-rail__grid::after{
+  content: none !important;
+}
+
+/* 2) Card sizing: match Flight Deck proportions (shorter) */
+.ika-results-page .ika-next-steps a.ika-rec-card{
+  min-height: 0;
+  padding: 14px 14px 14px;
+}
+
+/* 3) Typography: less shouty (closer to FD) */
+.ika-results-page .ika-next-steps .ika-rec-card__title{
+  font-size: 17px;
+  line-height: 1.18;
+  font-weight: 700;
+  margin-top: 6px;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__meta{
+  font-size: 13px;
+  font-weight: 600;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__why{
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.ika-results-page .ika-next-steps .ika-rec-card__cta{
+  font-size: 13px;
+  font-weight: 700;
+  padding-top: 8px;
+}
+
+/* 4) Chips: match FD style (subtle, same baseline, no overlap) */
+.ika-results-page .ika-next-steps .ika-rec-card__type{
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.80);
+  min-height: 24px;
+  margin-right: 90px; /* reserve for state chip */
+}
+
+/* State chip (top-right) – subtle */
+.ika-results-page .ika-next-steps a.ika-rec-card::after{
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  min-height: 24px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.10);
+  color: rgba(255,255,255,.78);
+}
+
+/* 5) Reduce "panel within panel" feel: card bg slightly darker like FD */
+.ika-results-page .ika-next-steps a.ika-rec-card{
+  background: rgba(13, 19, 31, 0.34);
+  border-color: rgba(255,255,255,.10);
+}
+.ika-results-page .ika-next-steps a.ika-rec-card:hover{
+  background: rgba(13, 19, 31, 0.42);
+  border-color: rgba(255,255,255,.16);
+}
+
+/* 6) Small alignment polish */
+.ika-results-page .ika-next-steps .ika-rec-card__meta,
+.ika-results-page .ika-next-steps .ika-rec-card__why{
+  text-align: left;
+}
+
+
+/* =========================================================
+   RESULTS: Recommended Next – Match Flight Deck Rec Cards (v10)
+   Notes:
+   - Scoped to results wrapper (.ika-results-page .ika-next-steps)
+   - Does NOT touch Answer Breakdown styles.
+========================================================= */
+
+.ika-results-page .ika-next-steps .ika-rec-rail {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail__sub {
+  opacity: 0.8;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-rail__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 960px) {
+  .ika-results-page .ika-next-steps .ika-rec-rail__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card shell – same as Flight Deck */
+.ika-results-page .ika-next-steps .ika-rec-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 16px;
+  padding-top: 44px; /* room for chips */
+  min-height: 188px; /* tighten height vs earlier */
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.32);
+}
+
+/* Type chip (top-left) */
+.ika-results-page .ika-next-steps .ika-rec-card__type {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  opacity: 0.95;
+  margin: 0;
+}
+
+/* State chip (top-right) – generated from card state class */
+.ika-results-page .ika-next-steps .ika-rec-card::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  opacity: 0.95;
+  color: inherit;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card.ika-rec-card--state-new::after { content: "NEW"; }
+.ika-results-page .ika-next-steps .ika-rec-card.ika-rec-card--state-in_progress::after { content: "IN PROGRESS"; }
+.ika-results-page .ika-next-steps .ika-rec-card.ika-rec-card--state-completed::after { content: "COMPLETED"; }
+.ika-results-page .ika-next-steps .ika-rec-card.ika-rec-card--state-unknown::after { content: "NEXT"; }
+
+/* Text hierarchy */
+.ika-results-page .ika-next-steps .ika-rec-card__title {
+  font-size: 1.35rem;
+  line-height: 1.12;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__meta {
+  opacity: 0.85;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  margin: 0 0 10px 0;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__why {
+  opacity: 0.75;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* CTA pinned to bottom */
+.ika-results-page .ika-next-steps .ika-rec-card__cta {
+  margin-top: auto;
+  padding-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.ika-results-page .ika-next-steps .ika-rec-card__cta::after {
+  content: "→";
+  display: inline-block;
+  transform: translateY(1px);
+}
+
+/* Hover accent like Flight Deck */
+.ika-results-page .ika-next-steps .ika-rec-card:hover .ika-rec-card__cta {
+  color: var(--ika-blue-400, #62A9F2);
+}
+
+/* Kill any legacy “oval mask”/clip-path styles if present */
+.ika-results-page .ika-next-steps .ika-rec-card,
+.ika-results-page .ika-next-steps .ika-rec-card * {
+  clip-path: none !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
+
+/* =========================================================
+   v12 Hotfix — Results Recommended Next
+   Only fixes:
+   (1) “Recommended next” heading weight
+   (2) Title/chip collision (title must start BELOW chip row)
+========================================================= */
+
+/* 1) Results rail heading uses .ika-rec-rail__label */
+.ika-rec-rail__label{
+  font-weight: 600 !important;
+  letter-spacing: -0.015em;
+}
+
+/* 2) Ensure the chip row is truly a “top row” and title clears it */
+.ika-rec-rail .ika-rec-card{
+  position: relative;
+  /* Reserve vertical space for chips row so titles never collide */
+  padding-top: 66px !important;
+}
+
+/* Type chip (top-left) */
+.ika-rec-rail .ika-rec-card__type{
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+
+/* State chip (top-right) injected by CSS (kept consistent with Flight Deck) */
+.ika-rec-rail .ika-rec-card::after{
+  position: absolute;
+  top: 18px;
+  right: 18px;
+}
+
+/* Section label: match page style (less heavy than before) */
+.ika-rec-rail .ika-rec-rail__label{
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+}
+
+/* Title: avoid margin-collapsing quirks; rely on card padding instead */
+.ika-rec-rail .ika-rec-card__title{
+  margin-top: 0 !important;
+}
+
+/* =========================================================
+   IKA Results - Recs Hotfix v14
+   ========================================================= */
+
+/* 1) Recommended next heading: larger, not ultra-bold */
+.ika-next-steps .ika-rec-rail__label,
+.ika-results-page .ika-next-steps .ika-rec-rail__label {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px 0 !important;
+}
+
+/* 3) Remove ALL-CAPS from card copy (chips stay uppercase) */
+.ika-next-steps a.ika-rec-card .ika-rec-card__title,
+.ika-next-steps a.ika-rec-card .ika-rec-card__meta,
+.ika-next-steps a.ika-rec-card .ika-rec-card__why,
+.ika-next-steps a.ika-rec-card .ika-rec-card__cta,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__title,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__meta,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__why,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__cta {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+/* Keep pills uppercase explicitly */
+.ika-next-steps a.ika-rec-card .ika-rec-card__type,
+.ika-next-steps a.ika-rec-card .ika-rec-card__state,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__type,
+.ika-results-page .ika-next-steps a.ika-rec-card .ika-rec-card__state {
+  text-transform: uppercase !important;
+  letter-spacing: .08em !important;
+}
+
+/* =========================================================
+   Results Page Mobile Pass (surgical)
+   Scope: .ika-results-page / .ika-results-main / .ika-stats-grid
+   Non-goals: do not change Answer Breakdown or Rec card styling
+   ========================================================= */
+
+@media (max-width: 900px) {
+  /* Ensure results content doesn't compress into 3 skinny columns */
+  .ika-results-page .ika-stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+
+  /* Stat cards: reduce padding slightly for mobile */
+  .ika-results-page .ika-stat-card {
+    padding: 18px 18px;
+  }
+
+  /* Stat value sizing: keep strong but avoid oversized */
+  .ika-results-page .ika-stat-value {
+    font-size: 32px;
+    line-height: 1.1;
+  }
+
+  /* Keep mini text readable */
+  .ika-results-page .ika-stat-mini {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  /* Next actions: stack and fill width */
+  .ika-results-page .ika-results-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 16px;
+    margin-bottom: 18px;
+  }
+
+  .ika-results-page .ika-action-pill {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 12px 14px;
+  }
+
+  /* Recommended next header spacing (avoid crowding) */
+  .ika-results-page #ika-results-recommended {
+    margin-top: 10px;
+  }
+
+  .ika-results-page #ika-results-recommended .ika-recs-title,
+  .ika-results-page #ika-results-recommended h2 {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Slightly smaller hero title on very small phones */
+  .ika-results-page .ika-hero-title {
+    font-size: 40px;
+    line-height: 1.05;
+  }
+
+  .ika-results-page .ika-hero-subtitle {
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  /* Stat values: reduce a touch more */
+  .ika-results-page .ika-stat-value {
+    font-size: 30px;
+  }
 }

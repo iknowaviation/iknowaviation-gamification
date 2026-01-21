@@ -1,0 +1,47 @@
+<!-- HERO WITH IMAGE -->
+<div class="ika-hero">
+  <div class="ika-hero-inner">
+    <div class="ika-hero-badge">Quiz debrief</div>
+    <h1 class="ika-hero-title">Nice work, {{user_name}}!</h1>
+    <p class="ika-hero-subtitle">
+      You just completed <strong>{{quiz_name}}</strong>.
+    </p>
+  </div>
+</div>
+
+<!-- MAIN BODY -->
+<div class="ika-results-main">
+  <!-- STATS (Option B: Gamified) -->
+  <div class="ika-stats-grid">
+    <div class="ika-stat-card">
+      <div class="ika-stat-label">Grade</div>
+      <div class="ika-stat-value"><span>{{grade}}</span></div>
+      <div class="ika-stat-mini">{{correct}} / {{total}} correct ({{percentage}}%).</div>
+    </div>
+
+    <div class="ika-stat-card">
+      <div class="ika-stat-label">XP earned</div>
+      <div class="ika-stat-value"><span>{{xp_earned}}</span></div>
+      <div class="ika-stat-mini">Added to your XP total.</div>
+    </div>
+
+    <div class="ika-stat-card">
+      <div class="ika-stat-label">Rank progress</div>
+      <div class="ika-stat-value"><span>[ika_rank_title]</span></div>
+      <div class="ika-stat-mini">
+        Total XP: <strong>[ika_total_xp]</strong><br>
+        <span class="ika-rank-progress">[ika_next_rank_progress]</span>
+      </div>
+    </div>
+  </div>
+
+  [ika_results_next_actions correct="{{correct}}" total="{{total}}" percentage="{{percentage}}"]
+
+  <!-- NEXT STEPS (scoped to recs only; avoids Flight Deck badge/level styles) -->
+  <div class="ika-next-steps ika-scope-recs">
+    [ika_recs context="results" type="all" limit="3" title="Recommended next" desc=""]
+  </div>
+
+  <!-- Answers are injected by Watu in the Final Screen AFTER this shortcode.
+       Keep them wrapped in .ika-answer-section in Watu so existing CSS can target it. -->
+</div>
