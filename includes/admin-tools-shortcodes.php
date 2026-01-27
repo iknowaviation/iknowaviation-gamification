@@ -360,3 +360,80 @@ function ika_gam_debug_user_rank_shortcode( $atts ) {
     return ob_get_clean();
 }
 add_shortcode( 'ika_debug_user_rank', 'ika_gam_debug_user_rank_shortcode' );
+
+/**
+ * [ika_flush_user_cache user_id="27" label="Flush user cache"]
+ *
+ * Admin-only. Flushes WP user/meta cache for the specified user.
+ * Useful after manual DB edits in phpMyAdmin (usermeta/ledger) where
+ * persistent object cache can show stale values.
+ */
+if ( ! function_exists( 'ika_gam_flush_user_cache_shortcode' ) ) {
+	function ika_gam_flush_user_cache_shortcode( $atts ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return '';
+		}
+
+		$atts = shortcode_atts(
+			array(
+				'user_id' => get_current_user_id(),
+				'label'   => 'Flush user cache',
+			),
+			$atts,
+			'ika_flush_user_cache'
+		);
+
+		$user_id = (int) $atts['user_id'];
+		if ( $user_id <= 0 ) {
+			return '';
+		}
+
+		$label = esc_html( $atts['label'] );
+
+		// If clicked, flush caches and show a confirmation.
+		$did_flush = false;
+		if ( isset( $_GET['ika_flush_user_cache'] ) && (int) $_GET['ika_flush_user_cache'] === $user_id ) {
+			$nonce_ok = isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'ika_flush_user_cache_' . $user_id );
+			if ( $nonce_ok ) {
+				$did_flush = true;
+
+				// Flush WP's user cache + usermeta cache.
+				if ( function_exists( 'clean_user_cache' ) ) {
+					clean_user_cache( $user_id );
+				}
+
+				// Extra safety for persistent caches: explicitly delete known groups.
+				if ( function_exists( 'wp_cache_delete' ) ) {
+					wp_cache_delete( $user_id, 'user_meta' );
+					wp_cache_delete( $user_id, 'users' );
+					wp_cache_delete( 'user_meta_' . $user_id, 'user_meta' );
+				}
+
+				// Some hosts/plugins expose a global cache flush. Use if present, but don't require it.
+				if ( function_exists( 'wp_cache_flush' ) ) {
+					wp_cache_flush();
+				}
+			}
+		}
+
+		$url = add_query_arg(
+			array(
+				'ika_flush_user_cache' => $user_id,
+			)
+		);
+
+		$url = wp_nonce_url( $url, 'ika_flush_user_cache_' . $user_id );
+
+		$html  = '<div class="ika-gam-admin-debug-link-wrap" style="margin:10px 0;">';
+		$html .= '<a href="' . esc_url( $url ) . '" class="ika-gam-admin-debug-link" style="display:inline-block;padding:6px 10px;border:1px solid #2271b1;border-radius:6px;background:#f0f6fc;">' . $label . '</a>';
+
+		if ( $did_flush ) {
+			$html .= '<div style="margin-top:8px;padding:8px 10px;border-left:4px solid #46b450;background:#f6ffed;">User cache flushed for ID ' . (int) $user_id . '.</div>';
+		}
+
+		$html .= '</div>';
+
+		return $html;
+	}
+	add_shortcode( 'ika_flush_user_cache', 'ika_gam_flush_user_cache_shortcode' );
+}

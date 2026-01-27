@@ -1,0 +1,217 @@
+/* =========================================================
+   IKA Achievements Modal (jQuery UI Dialog)
+   Clean, stable, production version
+   ========================================================= */
+
+/* ---------- Dialog shell ---------- */
+.ui-dialog.ika-ach-dialog {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 211, 115, 0.85);
+  background: linear-gradient(180deg, #0f1b2d 0%, #0a1220 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+/* ---------- Header ---------- */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar {
+  background: transparent;
+  border: none;
+  padding: 18px 22px 14px;
+  position: relative;
+}
+
+.ui-dialog.ika-ach-dialog .ui-dialog-title {
+  font-family: "Montserrat", sans-serif;
+  font-size: 26px;              /* FIXED: smaller header */
+  font-weight: 700;
+  color: #ffd373;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* subtle divider */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar::after {
+  content: "";
+  display: block;
+  height: 1px;
+  margin-top: 14px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.04)
+  );
+}
+
+/* ---------- Close (X) button ---------- */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+
+  width: 34px;
+  height: 34px;
+
+  padding: 0;
+  margin: 0;
+
+  border-radius: 50%;
+  border: 1px solid rgba(255, 211, 115, 0.45);
+  background: rgba(255, 255, 255, 0.04);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  cursor: pointer;
+}
+
+/* remove jQuery UI default icon */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close .ui-icon {
+  display: none;
+}
+
+/* custom X */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close::before {
+  content: "×";
+  font-size: 18px;              /* FIXED: clean, readable */
+  font-weight: 400;             /* FIXED: not bold */
+  line-height: 1;
+  color: #ffffff;
+}
+
+/* hover */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close:hover {
+  background: rgba(255, 211, 115, 0.12);
+  border-color: rgba(255, 211, 115, 0.75);
+}
+
+/* kill focus rings / blue glow */
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close:focus,
+.ui-dialog.ika-ach-dialog .ui-dialog-titlebar-close:active {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ---------- Content wrapper ---------- */
+.ui-dialog.ika-ach-dialog .ui-dialog-content {
+  background: transparent;
+  padding: 20px 22px 24px;
+  border: none;
+}
+
+/* ---------- Modal body ---------- */
+.ika-ach-modal {
+  background: transparent;
+}
+
+.ika-ach-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- Achievement item ---------- */
+.ika-ach-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  padding: 16px 18px;
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* icon placeholder */
+.ika-ach-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Text hierarchy ---------- */
+.ika-ach-kicker {
+  font-size: 12px;              /* FIXED: smaller */
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0 0 4px;
+}
+
+.ika-ach-title {
+  font-size: 18px;              /* FIXED: reduced */
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px;
+}
+
+.ika-ach-sub {
+  font-size: 14px;              /* FIXED: reduced */
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
+/* =========================================================
+   IKA Achievements Modal – FINAL OVERRIDES (append at end)
+   Fixes ONLY:
+   1) Center the X inside the circular close button
+   2) Remove the inner “header strip” inside the badge card
+   ========================================================= */
+
+/* --- 1) Close button: force our own centered X and kill any UI theme icon --- */
+.ui-dialog.ika-ach-dialog > .ui-dialog-titlebar > button.ui-dialog-titlebar-close{
+  /* do NOT change your circle styling; just ensure the glyph is centered */
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  /* jQuery UI/theme icon killers */
+  background-image: none !important;
+  text-indent: 0 !important;
+  overflow: hidden !important;
+
+  /* prevents odd baseline alignment */
+  line-height: 1 !important;
+  font-size: 0 !important; /* hides any stray text-based icon */
+}
+
+/* If any theme/jQuery UI pseudo icon exists, remove it */
+.ui-dialog.ika-ach-dialog > .ui-dialog-titlebar > button.ui-dialog-titlebar-close::after{
+  content: none !important;
+  display: none !important;
+}
+
+/* Draw our centered X */
+.ui-dialog.ika-ach-dialog > .ui-dialog-titlebar > button.ui-dialog-titlebar-close::before{
+  content: "×" !important;
+  display: block !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;          /* not bold */
+  line-height: 1 !important;
+  color: rgba(255,255,255,0.88) !important;
+
+  /* tiny optical centering */
+  transform: translateY(-1px) !important;
+}
+
+/* --- 2) Remove the inner “header strip” inside the badge detail card --- */
+.ui-dialog.ika-ach-dialog .ika-ach-body .ika-ach-item{
+  /* strip usually comes from a gradient/bg-image or inset shadow */
+  background-image: none !important;
+  box-shadow: none !important;
+  border-top: 0 !important;
+}
+
+/* If that strip is from a pseudo overlay, kill it */
+.ui-dialog.ika-ach-dialog .ika-ach-body .ika-ach-item::before,
+.ui-dialog.ika-ach-dialog .ika-ach-body .ika-ach-item::after{
+  content: none !important;
+  display: none !important;
+}
+
+
+

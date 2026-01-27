@@ -3,180 +3,181 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+/**
+ * Flush WP user/meta caches for a user.
+ *
+ * Why: Direct DB edits (phpMyAdmin) do not invalidate WP's object cache.
+ * This helper forces user meta to reflect current DB state.
+ */
+if ( ! function_exists( 'ika_flush_user_cache' ) ) {
+	function ika_flush_user_cache( int $user_id ) : void {
+		if ( $user_id <= 0 ) return;
+		// Clears user meta cache.
+		clean_user_cache( $user_id );
+		// Best-effort object cache deletes.
+		wp_cache_delete( $user_id, 'user_meta' );
+		wp_cache_delete( $user_id, 'users' );
+		// If a persistent object cache is active, flush just this group if supported.
+		if ( function_exists( 'wp_cache_flush_group' ) ) {
+			@wp_cache_flush_group( 'user_meta' );
+		}
+	}
+}
+
 /* ======================================================================
- * Rank ladder + helpers (using your existing ladder)
+ * Rank ladder + helpers (CANONICAL: IKA XP ladder)
  * ======================================================================*/
 
 /**
- * Rank ladder: now driven primarily by WatuPRO Play levels.
+ * Canonical IKA Rank Ladder (Phase 1 foundation)
  *
- * - If we can read levels from the watuproplay_levels table, use those.
- *   Each LEVEL row becomes a rank with:
- *     - label = name
- *     - slug  = sanitize_title( name )
- *     - min_xp = required_points
+ * IMPORTANT:
+ * - This ladder is the single source of truth for rank thresholds across the site.
+ * - WatuPRO Play "levels" are treated as an ASSET LIBRARY ONLY (icons/names), not as threshold drivers.
  *
- * - If the table is missing or empty, fall back to the original hard-coded ladder
- *   so nothing breaks.
+ * If you later want ladder management in WP Admin, add a dedicated IKA settings UI
+ * that writes to an IKA-owned option/meta and update this function to read that.
+ * Do NOT derive thresholds from Watu Play required_points.
  */
 function ika_get_rank_ladder() {
-    // Prefer WatuPRO Play levels if available.
-    if ( function_exists( 'ika_watuproplay_get_level_thresholds' ) ) {
-        $thresholds = ika_watuproplay_get_level_thresholds();
 
-        if ( ! empty( $thresholds ) ) {
-            $ladder = array();
+    // Locked IKA XP ladder (Phase 1 foundation):
+    // 0, 50, 150, 300, 500, 800, 1200, 1700, 2500, 3500, 5000
+    $ladder = array(
+        array( 'slug' => 'aviation-enthusiast',      'label' => 'Aviation Enthusiast',      'min_xp' => 0 ),
+        array( 'slug' => 'student-pilot',           'label' => 'Student Pilot',           'min_xp' => 50 ),
+        array( 'slug' => 'sport-pilot',             'label' => 'Sport Pilot',             'min_xp' => 150 ),
+        array( 'slug' => 'private-pilot',           'label' => 'Private Pilot',           'min_xp' => 300 ),
+        array( 'slug' => 'instrument-rated',        'label' => 'Instrument Rated',        'min_xp' => 500 ),
+        array( 'slug' => 'commercial-pilot',        'label' => 'Commercial Pilot',        'min_xp' => 800 ),
+        array( 'slug' => 'airline-transport-pilot', 'label' => 'Airline Transport Pilot', 'min_xp' => 1200 ),
+        array( 'slug' => 'airline-first-officer',   'label' => 'Airline First Officer',   'min_xp' => 1700 ),
+        array( 'slug' => 'airline-captain',         'label' => 'Airline Captain',         'min_xp' => 2500 ),
+        array( 'slug' => 'chief-pilot',             'label' => 'Chief Pilot',             'min_xp' => 3500 ),
+        array( 'slug' => 'aviation-master',         'label' => 'Aviation Master',         'min_xp' => 5000 ),
+    );
 
-            foreach ( $thresholds as $row ) {
-                $name   = isset( $row['name'] ) ? $row['name'] : '';
-                $min_xp = isset( $row['required_points'] ) ? (int) $row['required_points'] : 0;
+    // Allow future extension without editing core (but keep IKA-owned sources only).
+    $ladder = apply_filters( 'ika_rank_ladder', $ladder );
 
-                if ( '' === $name ) {
-                    continue;
-                }
-
-                $ladder[] = array(
-                    'slug'   => sanitize_title( $name ),
-                    'label'  => $name,
-                    'min_xp' => $min_xp,
-                );
-            }
-
-            // Just to be safe, ensure it’s sorted by min_xp ascending.
-            usort(
-                $ladder,
-                function ( $a, $b ) {
-                    return $a['min_xp'] <=> $b['min_xp'];
-                }
-            );
-
-            return $ladder;
+    // Defensive sort (prevents accidental out-of-order edits from breaking rank calc).
+    usort(
+        $ladder,
+        function ( $a, $b ) {
+            return (int)($a['min_xp'] ?? 0) <=> (int)($b['min_xp'] ?? 0);
         }
-    }
+    );
 
-	// ---- Fallback ladder (ONLY used if WatuPRO Play levels cannot be read) ----
-	// This MUST match your locked IKA XP ladder (Phase 1 foundation):
-	// 0, 50, 150, 300, 500, 800, 1200, 1700, 2500, 3500, 5000
-	$ladder = array(
-		array( 'slug' => 'aviation-enthusiast',     'label' => 'Aviation Enthusiast',     'min_xp' => 0 ),
-		array( 'slug' => 'student-pilot',          'label' => 'Student Pilot',          'min_xp' => 50 ),
-		array( 'slug' => 'sport-pilot',            'label' => 'Sport Pilot',            'min_xp' => 150 ),
-		array( 'slug' => 'private-pilot',          'label' => 'Private Pilot',          'min_xp' => 300 ),
-		array( 'slug' => 'instrument-rated',       'label' => 'Instrument Rated',       'min_xp' => 500 ),
-		array( 'slug' => 'commercial-pilot',       'label' => 'Commercial Pilot',       'min_xp' => 800 ),
-		array( 'slug' => 'airline-transport-pilot','label' => 'Airline Transport Pilot','min_xp' => 1200 ),
-		array( 'slug' => 'airline-first-officer',  'label' => 'Airline First Officer',  'min_xp' => 1700 ),
-		array( 'slug' => 'airline-captain',        'label' => 'Airline Captain',        'min_xp' => 2500 ),
-		array( 'slug' => 'chief-pilot',            'label' => 'Chief Pilot',            'min_xp' => 3500 ),
-		array( 'slug' => 'aviation-master',        'label' => 'Aviation Master',        'min_xp' => 5000 ),
-	);
-
-	// Defensive sort (prevents accidental out-of-order edits from breaking rank calc).
-	usort(
-		$ladder,
-		function ( $a, $b ) {
-			return $a['min_xp'] <=> $b['min_xp'];
-		}
-	);
-
-	return $ladder;
+    return $ladder;
 }
 
 /**
  * Rank for a given XP.
  */
 function ika_get_rank_for_xp( $xp ) {
-	$xp     = floatval( $xp );
-	$ladder = ika_get_rank_ladder();
-	$current = $ladder[0];
+    $xp      = floatval( $xp );
+    $ladder  = ika_get_rank_ladder();
+    $current = $ladder[0];
 
-	foreach ( $ladder as $step ) {
-		if ( $xp >= $step['min_xp'] ) {
-			$current = $step;
-		} else {
-			break;
-		}
-	}
-	return $current;
+    foreach ( $ladder as $step ) {
+        if ( $xp >= (float)$step['min_xp'] ) {
+            $current = $step;
+        } else {
+            break;
+        }
+    }
+    return $current;
 }
 
 /**
  * Next rank after current XP (or null for top rank).
  */
 function ika_get_next_rank_for_xp( $xp ) {
-	$xp     = floatval( $xp );
-	$ladder = ika_get_rank_ladder();
-	foreach ( $ladder as $step ) {
-		if ( $xp < $step['min_xp'] ) {
-			return $step;
-		}
-	}
-	return null;
+    $xp     = floatval( $xp );
+    $ladder = ika_get_rank_ladder();
+    foreach ( $ladder as $step ) {
+        if ( $xp < (float)$step['min_xp'] ) {
+            return $step;
+        }
+    }
+    return null;
 }
 
 /**
  * Convenience: XP + rank data for a user.
  */
 function ika_get_user_xp_and_rank( $user_id = 0 ) {
-	$user_id = $user_id ?: get_current_user_id();
-	if ( ! $user_id ) return null;
+    $user_id = $user_id ? (int) $user_id : get_current_user_id();
 
-	$xp   = floatval( get_user_meta( $user_id, 'ika_total_xp', true ) );
-	$rank = ika_get_rank_for_xp( $xp );
+    // Single source of truth for XP:
+    // - quiz XP: SUM(xp) from IKA XP Ledger
+    // - bonus XP: ika_total_xp_bonus (missions/promos)
+    // Cached combined total is stored as ika_total_xp.
+    $xp = (float) ika_get_total_xp_canonical( $user_id );
 
-	return array(
-		'xp'         => intval( $xp ),
-		'rank_slug'  => $rank['slug'],
-		'rank_label' => $rank['label'],
-	);
+    $rank = ika_get_rank_for_xp( $xp );
+    $next = ika_get_next_rank_for_xp( $xp );
+
+    return array(
+        'user_id' => $user_id,
+        'xp'      => $xp,
+        'rank'    => $rank,
+        'next'    => $next,
+    );
 }
-
-/* Give new users a starting rank (0 XP). */
-add_action( 'user_register', function( $user_id ) {
-	$user_id = (int) $user_id;
-	if ( ! $user_id ) return;
-
-	$xp   = 0;
-	$rank = ika_get_rank_for_xp( $xp );
-
-	update_user_meta( $user_id, 'ika_total_xp',   $xp );
-	update_user_meta( $user_id, 'ika_rank_slug',  $rank['slug'] );
-	update_user_meta( $user_id, 'ika_rank_label', $rank['label'] );
-} );
-
 
 /* ======================================================================
- * Generic meta helpers
+ * Canonical XP helpers
  * ======================================================================*/
 
-function ika_get_user_meta_int( $meta_key, $default = 0, $user_id = 0 ) {
-	if ( ! $user_id ) {
-		$user_id = get_current_user_id();
-	}
-	if ( ! $user_id ) {
-		return (int) $default;
-	}
+/**
+ * Canonical Total XP getter.
+ *
+ * IMPORTANT:
+ * - Do NOT read legacy keys (ika_xp_total, watuproplay-points, watupro_total_points, etc.)
+ * - The only truth is: SUM(ika_xp_ledger.xp for quiz_attempt) + ika_total_xp_bonus
+ * - We cache totals to ika_total_xp / ika_total_xp_quiz for performance.
+ */
+if ( ! function_exists( 'ika_get_total_xp_canonical' ) ) {
+function ika_get_total_xp_canonical( $user_id = 0, $force_recompute = false ) : int {
+    $user_id = $user_id ? (int) $user_id : (int) get_current_user_id();
+    if ( $user_id <= 0 ) {
+        return 0;
+    }
 
-	$value = get_user_meta( $user_id, $meta_key, true );
-	if ( $value === '' || $value === null ) {
-		return (int) $default;
-	}
+    $cached = get_user_meta( $user_id, 'ika_total_xp', true );
+    if ( ! $force_recompute && $cached !== '' && $cached !== null ) {
+        return max( 0, (int) $cached );
+    }
 
-	return (int) $value;
+    // Bonus XP (missions, promos, etc.)
+    $bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
+    $bonus_xp = max( 0, $bonus_xp );
+
+    // Quiz XP from ledger
+    $quiz_xp_total = 0;
+    if ( function_exists( 'ika_xp_ledger_table' ) ) {
+        global $wpdb;
+        $ledger_table = ika_xp_ledger_table();
+        $quiz_xp_total = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(xp),0) FROM {$ledger_table} WHERE user_id = %d AND source = %s",
+            $user_id,
+            'quiz_attempt'
+        ) );
+    }
+
+    $total_xp = (int) $quiz_xp_total + $bonus_xp;
+    $total_xp = max( 0, $total_xp );
+
+    // Cache canonical totals.
+    update_user_meta( $user_id, 'ika_total_xp_quiz', (int) $quiz_xp_total );
+    update_user_meta( $user_id, 'ika_total_xp', $total_xp );
+
+    // Clean up legacy keys that can confuse debugging/UI.
+    // We do NOT touch Watu Play internal state (badges/levels) here.
+    delete_user_meta( $user_id, 'ika_xp_total' );
+    delete_user_meta( $user_id, 'ika_xp_bonus_ledger' );
+
+    return $total_xp;
 }
-
-function ika_get_user_meta_float( $meta_key, $default = 0.0, $user_id = 0 ) {
-	if ( ! $user_id ) {
-		$user_id = get_current_user_id();
-	}
-	if ( ! $user_id ) {
-		return (float) $default;
-	}
-
-	$value = get_user_meta( $user_id, $meta_key, true );
-	if ( $value === '' || $value === null ) {
-		return (float) $default;
-	}
-
-	return (float) $value;
 }

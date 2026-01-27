@@ -286,13 +286,23 @@ add_action( 'wp_enqueue_scripts', function () {
 			ika_gam_asset_ver( $results_rel )
 		);
 
-		// Watu Play modal styling (badge/level modal)
-		$modal_rel = '/assets/css/ika_watuproplay_modal.css';
+
+		// Achievements modal (IKA-owned)
+		$ach_css_rel = '/assets/css/ika_achievements_modal.css';
 		wp_enqueue_style(
-			'ika-watuproplay-modal',
-			$ika_base_url . $modal_rel,
+			'ika-achievements-modal',
+			$ika_base_url . $ach_css_rel,
 			array( 'ika-master' ),
-			ika_gam_asset_ver( $modal_rel )
+			ika_gam_asset_ver( $ach_css_rel )
+		);
+
+		$ach_js_rel = '/assets/js/ika_achievements_modal.js';
+		wp_enqueue_script(
+			'ika-achievements-modal',
+			$ika_base_url . $ach_js_rel,
+			array( 'jquery', 'jquery-ui-dialog' ),
+			ika_gam_asset_ver( $ach_js_rel ),
+			true
 		);
 	}
 

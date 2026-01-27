@@ -56,7 +56,7 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
             // Pull recent finished attempts.
             $attempts = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT exam_id, percent_correct, points, end_time
+                    "SELECT id AS taking_id, exam_id, percent_correct, points, end_time
                      FROM {$takings_tbl}
                      WHERE user_id = %d
                        AND (in_progress IS NULL OR in_progress = 0)
@@ -137,7 +137,7 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
                         'url'      => $url,
                         'score'    => sprintf( '%d%%', (int) round( $pct ) ),
                         'attempts' => (string) ( $counts[ $exam_id ] ?? 1 ),
-                        'xp'       => ( isset( $a->points ) ? ( '+' . intval( $a->points ) ) : '' ),
+                        'xp'       => ( isset( $a->points ) ? ( '+' . ( function_exists('ika_xp_for_taking') ? ika_xp_for_taking( (int)($a->taking_id ?? 0) ) : intval( $a->points ) ) ) : '' ),
                         'status'   => $is_complete ? 'Completed' : 'In Progress',
                         'status_key'   => $is_complete ? 'completed' : 'in_progress',
                         'status_class' => $is_complete ? 'is-complete' : 'is-started',

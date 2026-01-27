@@ -32,7 +32,7 @@ if ( ! function_exists( 'ika_fd_get_recent_activity_items' ) ) {
 
 		$attempts = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT exam_id, percent_correct, points, end_time\n\t\t\t\t FROM {$takings_tbl}\n\t\t\t\t WHERE user_id = %d\n\t\t\t\t   AND (in_progress IS NULL OR in_progress = 0)\n\t\t\t\t   AND (ignore_attempt IS NULL OR ignore_attempt = 0)\n\t\t\t\t ORDER BY COALESCE(end_time,'') DESC, ID DESC\n\t\t\t\t LIMIT %d",
+				"SELECT id AS taking_id, exam_id, percent_correct, points, end_time\n\t\t\t\t FROM {$takings_tbl}\n\t\t\t\t WHERE user_id = %d\n\t\t\t\t   AND (in_progress IS NULL OR in_progress = 0)\n\t\t\t\t   AND (ignore_attempt IS NULL OR ignore_attempt = 0)\n\t\t\t\t ORDER BY COALESCE(end_time,'') DESC, ID DESC\n\t\t\t\t LIMIT %d",
 				$user_id,
 				max( 10, $limit * 6 )
 			)
@@ -45,7 +45,8 @@ if ( ! function_exists( 'ika_fd_get_recent_activity_items' ) ) {
 
 			$exam_id = (int) ( $a->exam_id ?? 0 );
 			$pct     = isset( $a->percent_correct ) ? (int) round( (float) $a->percent_correct ) : 0;
-			$xp      = isset( $a->points ) ? (int) $a->points : 0;
+			$taking_id = (int) ( $a->taking_id ?? 0 );
+			$xp = function_exists( 'ika_xp_for_taking' ) ? (int) ika_xp_for_taking( $taking_id ) : ( isset( $a->points ) ? (int) $a->points : 0 );
 
 			$post_id = function_exists( 'ika_fd_get_quiz_post_id_by_exam_id' ) ? ika_fd_get_quiz_post_id_by_exam_id( $exam_id ) : 0;
 			$title   = $post_id ? get_the_title( $post_id ) : ( 'Quiz #' . $exam_id );

@@ -125,15 +125,14 @@ function ika_dm_add_xp( $user_id, $xp, $reason = "" ) {
 	if ( function_exists( 'ika_xp_bonus_add' ) ) {
 		ika_xp_bonus_add( (int) $user_id, (int) $xp, (string) $reason );
 	}
-// Keep legacy key for backward compatibility (safe no-op for new installs).
-    $legacy = (int) get_user_meta( $user_id, 'ika_xp_total', true );
-    $legacy = max( 0, $legacy + $xp );
-    update_user_meta( $user_id, 'ika_xp_total', $legacy );
-
-    // Sync the displayed total XP = quiz XP + bonus XP.
-    $quiz_xp  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
-    $total_xp = max( 0, $quiz_xp + $bonus );
-    update_user_meta( $user_id, 'ika_total_xp', $total_xp );
+	// Sync canonical totals (quiz XP from ledger + bonus XP).
+	if ( function_exists( 'ika_get_total_xp_canonical' ) ) {
+		ika_get_total_xp_canonical( (int) $user_id, true );
+	} else {
+		$quiz_xp  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
+		$total_xp = max( 0, $quiz_xp + $bonus );
+		update_user_meta( $user_id, 'ika_total_xp', $total_xp );
+	}
 }
 
 /**
@@ -411,7 +410,9 @@ function ika_dm_filter_get_avatar( $avatar, $id_or_email, $size, $default_value,
         return $avatar;
     }
 
-    $xp    = (int) get_user_meta( $user_id, 'ika_xp_total', true );
+	$xp    = function_exists( 'ika_get_total_xp_canonical' )
+		? (int) ika_get_total_xp_canonical( (int) $user_id )
+		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
     $level = ika_dm_get_level_from_xp( $xp );
 
     // Wrap avatar in a span so we can draw a ring + badge via CSS.
@@ -457,7 +458,9 @@ function ika_dm_shortcode_render() {
     $state    = ika_dm_get_state( $user_id );
     $missions = $config;
 
-    $xp_total       = (int) get_user_meta( $user_id, 'ika_xp_total', true );
+	$xp_total       = function_exists( 'ika_get_total_xp_canonical' )
+		? (int) ika_get_total_xp_canonical( (int) $user_id )
+		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
     $streak_current = (int) get_user_meta( $user_id, 'ika_daily_streak', true );
     $streak_best    = (int) get_user_meta( $user_id, 'ika_best_streak', true );
     $level          = ika_dm_get_level_from_xp( $xp_total );
@@ -564,7 +567,9 @@ function ika_dm_shortcode_user_level( $atts = array() ) {
     );
 
     $user_id = get_current_user_id();
-    $xp      = (int) get_user_meta( $user_id, 'ika_xp_total', true );
+	$xp      = function_exists( 'ika_get_total_xp_canonical' )
+		? (int) ika_get_total_xp_canonical( (int) $user_id )
+		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
     $level   = ika_dm_get_level_from_xp( $xp );
 
     if ( 'true' === strtolower( $atts['number_only'] ) ) {
@@ -672,7 +677,8 @@ if ( ! function_exists( 'ika_xp_recompute_total' ) ) {
 		update_user_meta( $user_id, 'ika_total_xp', $total );
 
 		// Back-compat key (legacy).
-		update_user_meta( $user_id, 'ika_xp_total', $total );
+		// Keep canonical cache in sync.
+		update_user_meta( $user_id, 'ika_total_xp', $total );
 
 		return $total;
 	}

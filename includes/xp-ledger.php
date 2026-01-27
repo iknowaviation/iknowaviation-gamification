@@ -21,11 +21,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - Awards are idempotent via UNIQUE(taking_id, source).
  * ======================================================================*/
 
+if ( ! function_exists( 'ika_xp_ledger_table' ) ) {
 function ika_xp_ledger_table() {
     global $wpdb;
     return $wpdb->prefix . 'ika_xp_ledger';
 }
+}
 
+if ( ! function_exists( 'ika_xp_ledger_install' ) ) {
 function ika_xp_ledger_install() {
     global $wpdb;
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -51,11 +54,13 @@ function ika_xp_ledger_install() {
 
     dbDelta( $sql );
 }
+}
 add_action( 'plugins_loaded', 'ika_xp_ledger_install', 20 );
 
 /**
  * Get true IKA XP for a given taking_id.
  */
+if ( ! function_exists( 'ika_xp_for_taking' ) ) {
 function ika_xp_for_taking( int $taking_id ) : int {
     global $wpdb;
     if ( $taking_id <= 0 ) {
@@ -71,6 +76,7 @@ function ika_xp_for_taking( int $taking_id ) : int {
 
     return (int) $xp;
 }
+}
 
 /**
  * Calculate XP for a Watu attempt.
@@ -79,6 +85,7 @@ function ika_xp_for_taking( int $taking_id ) : int {
  * We prefer Watu's stored per-attempt counts (num_correct/num_wrong/num_empty),
  * because question types like multi-answer can produce multiple student_answer rows.
  */
+if ( ! function_exists( 'ika_calc_xp_for_taking' ) ) {
 function ika_calc_xp_for_taking( int $taking_id ) : array {
     global $wpdb;
 
@@ -165,6 +172,7 @@ function ika_calc_xp_for_taking( int $taking_id ) : array {
         ),
     );
 }
+}
 
 /**
  * Award XP on quiz completion.
@@ -173,6 +181,7 @@ function ika_calc_xp_for_taking( int $taking_id ) : array {
  * We insert a ledger row even when XP == 0 so the Results page never falls back
  * to Watu "points". This keeps results deterministic.
  */
+if ( ! function_exists( 'ika_award_xp_on_watupro_completed_exam' ) ) {
 function ika_award_xp_on_watupro_completed_exam( $taking_id ) {
     $taking_id = (int) $taking_id;
     if ( $taking_id <= 0 ) {
@@ -206,9 +215,126 @@ function ika_award_xp_on_watupro_completed_exam( $taking_id ) {
         $meta_json
     ) );
 
-    // Rebuild user stats after awarding.
+    // Rebuild user stats after awarding (this updates ika_total_xp, rank meta, etc.).
+    $old_xp = (float) get_user_meta( $user_id, 'ika_total_xp', true );
+    if ( ! is_numeric( $old_xp ) ) { $old_xp = 0; }
+
     if ( function_exists( 'ika_rebuild_stats_for_user' ) ) {
         ika_rebuild_stats_for_user( $user_id );
     }
+
+    // After stats rebuild, run Option C achievements awarding (levels + badges) driven by IKA XP.
+    $new_xp = (float) get_user_meta( $user_id, 'ika_total_xp', true );
+    if ( ! is_numeric( $new_xp ) ) { $new_xp = 0; }
+
+    if ( function_exists( 'ika_ach_process_awards_after_xp_change' ) ) {
+        ika_ach_process_awards_after_xp_change( $user_id, $old_xp, $new_xp, array(
+            'taking_id' => $taking_id,
+            'exam_id'   => $exam_id,
+            'source'    => 'quiz_attempt',
+        ) );
+    }}
 }
 add_action( 'watupro_completed_exam', 'ika_award_xp_on_watupro_completed_exam', 15 );
+
+
+/* ======================================================================
+ * Canonical XP totals (single source of truth)
+ * ======================================================================*/
+
+if ( ! function_exists( 'ika_get_total_xp_ledger_sum' ) ) {
+/**
+ * Sum XP from the IKA XP ledger.
+ *
+ * @param int $user_id
+ * @param int|null $days Optional window (e.g. 7 for last 7 days). Null = all time.
+ * @return int
+ */
+function ika_get_total_xp_ledger_sum( $user_id, $days = null ) {
+    global $wpdb;
+    $user_id = (int) $user_id;
+    $table = ika_xp_ledger_table();
+
+    if ( $days !== null ) {
+        $days = (int) $days;
+        // created_at is DATETIME (UTC/server time). Use DATE_SUB(NOW()) window.
+        $sql = $wpdb->prepare(
+            "SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE user_id = %d AND created_at >= (NOW() - INTERVAL %d DAY)",
+            $user_id,
+            $days
+        );
+        return (int) $wpdb->get_var( $sql );
+    }
+
+    $sql = $wpdb->prepare(
+        "SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE user_id = %d",
+        $user_id
+    );
+    return (int) $wpdb->get_var( $sql );
+}
+}
+
+if ( ! function_exists( 'ika_get_total_xp_canonical' ) ) {
+/**
+ * Canonical total XP for a user.
+ *
+ * IMPORTANT (2026-01): XP is derived ONLY from ika_xp_ledger.
+ * Do not add usermeta-based bonus totals here; all bonuses must be written as ledger rows
+ * (e.g., source = mission_bonus) so weekly/all-time are consistent everywhere.
+ *
+ * @param int $user_id
+ * @return int
+ */
+function ika_get_total_xp_canonical( $user_id ) {
+    return ika_get_total_xp_ledger_sum( (int) $user_id, null );
+}
+}
+
+if ( ! function_exists( 'ika_leaderboard_cache_bump' ) ) {
+/**
+ * Bump leaderboard cache version so UI is never "one quiz behind".
+ */
+function ika_leaderboard_cache_bump() {
+    $v = (int) get_option( 'ika_lb_cache_v', 1 );
+    update_option( 'ika_lb_cache_v', $v + 1, false );
+}
+}
+
+
+if ( ! function_exists( 'ika_get_xp_breakdown_from_ledger' ) ) {
+/**
+ * Return quiz/bonus/total XP from ledger.
+ *
+ * @param int $user_id
+ * @param int|null $days Optional window.
+ * @return array{quiz:int, bonus:int, total:int}
+ */
+function ika_get_xp_breakdown_from_ledger( $user_id, $days = null ) {
+    global $wpdb;
+    $user_id = (int) $user_id;
+    $table = ika_xp_ledger_table();
+
+    $where_window = '';
+    $params = array( $user_id );
+    if ( $days !== null ) {
+        $days = (int) $days;
+        $where_window = " AND created_at >= (NOW() - INTERVAL %d DAY)";
+        $params[] = $days;
+    }
+
+    // quiz XP
+    $sql_quiz = "SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE user_id = %d AND source = 'quiz_attempt'{$where_window}";
+    $quiz = (int) $wpdb->get_var( $wpdb->prepare( $sql_quiz, ...$params ) );
+
+    // bonus XP = everything else
+    $sql_bonus = "SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE user_id = %d AND source <> 'quiz_attempt'{$where_window}";
+    $bonus = (int) $wpdb->get_var( $wpdb->prepare( $sql_bonus, ...$params ) );
+
+    return array(
+        'quiz'  => $quiz,
+        'bonus' => $bonus,
+        'total' => $quiz + $bonus,
+    );
+}
+}
+

@@ -3353,3 +3353,169 @@ html {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ================================
+   Flight Log – empty states spacing fix
+   Prevent empty messaging from overlapping table content
+================================ */
+
+/* Make sure the table card behaves like a normal flow container */
+.ika-fd-flightlog-tablecard {
+  position: relative;
+}
+
+/* Reserve visual space for the table area even when there are 0 rows */
+.ika-fd-flightlog-tablecard .ika-fd-table-scroll {
+  min-height: 110px; /* enough to prevent the empty message from colliding */
+}
+
+/* “No attempts yet” block — force clean block layout + readable spacing */
+.ika-fd-flightlog-empty {
+  position: relative !important;
+  display: block;
+  margin-top: 14px !important;
+  padding: 14px 16px;
+  border-radius: 14px;
+  line-height: 1.35;
+}
+
+/* Tighten title/meta spacing */
+.ika-fd-flightlog-empty__title {
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+
+.ika-fd-flightlog-empty__meta {
+  margin: 0 0 10px 0;
+  line-height: 1.35;
+}
+
+/* Recent Activity empty item — same spacing discipline */
+.ika-fd-activity-item.is-empty {
+  padding: 12px 14px;
+  line-height: 1.35;
+}
+
+.ika-fd-activity-item.is-empty .ika-fd-activity-title {
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+}
+
+.ika-fd-activity-item.is-empty .ika-fd-activity-meta {
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* ================================
+   Flight Log – empty-state spacing + typography polish
+   (tighten gap between table header + empty message)
+================================ */
+
+/* Reduce the reserved empty space created by the table scroll area */
+.ika-fd-flightlog-tablecard .ika-fd-table-scroll {
+  min-height: 0 !important;       /* undo previous fix */
+  padding-bottom: 0 !important;
+}
+
+/* If tbody is empty, the table itself should not create a tall box */
+.ika-fd-flightlog-table tbody:empty {
+  display: none;
+}
+
+/* Bring the empty message closer to the header row */
+.ika-fd-flightlog-empty {
+  margin-top: 10px !important;     /* was effectively much larger due to scroll min-height */
+  padding: 12px 14px;
+}
+
+/* Title stays strong, but not oversized */
+.ika-fd-flightlog-empty__title {
+  margin: 0 0 6px 0;
+  line-height: 1.25;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Meta should match your “kicker/meta” style: smaller + calmer */
+.ika-fd-flightlog-empty__meta {
+  margin: 0 0 10px 0;
+  line-height: 1.35;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* Keep the link from feeling cramped */
+.ika-fd-flightlog-empty .ika-hub-section-link {
+  display: inline-block;
+  margin-top: 2px;
+}
+
+
+/* =========================================================
+   TABLE VISUAL UNIFICATION (Flight Log + Leaderboard)
+   Goal: both tables share the same header/cell/border styling.
+   Keep column sizing + special cell rules in their own sections.
+========================================================= */
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table,
+.ika-scope-flightdeck table.ika-hub-flightlog-table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0,0,0,0.10);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table thead th,
+.ika-scope-flightdeck table.ika-hub-flightlog-table thead th{
+  padding: 10px 12px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: rgba(193, 212, 255, 0.85);
+  background: rgba(0,0,0,0.18);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table thead th + th,
+.ika-scope-flightdeck table.ika-hub-flightlog-table thead th + th{
+  border-left: 1px solid rgba(255,255,255,0.06);
+}
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table tbody td,
+.ika-scope-flightdeck table.ika-hub-flightlog-table tbody td{
+  padding: 12px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(228, 238, 255, 0.92);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  vertical-align: middle;
+}
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table tbody tr:first-child td,
+.ika-scope-flightdeck table.ika-hub-flightlog-table tbody tr:first-child td{
+  border-top: none;
+}
+
+.ika-scope-flightdeck table.ika-fd-flightlog-table tbody tr:hover td,
+.ika-scope-flightdeck table.ika-hub-flightlog-table tbody tr:hover td{
+  background: rgba(98,169,242,0.06);
+}
+
+/* Keep numeric columns from wrapping (applies to both tables safely) */
+.ika-scope-flightdeck table.ika-fd-flightlog-table td,
+.ika-scope-flightdeck table.ika-hub-flightlog-table td{
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Leaderboard: ensure the wrapper doesn't add its own conflicting borders */
+.ika-scope-flightdeck .ika-fd-leaderboard-card{
+  border: none;
+  background: transparent;
+}

@@ -110,4 +110,10 @@ class IKA_WatuPlay_Modal_Bridge {
 	}
 }
 
-IKA_WatuPlay_Modal_Bridge::init();
+// IMPORTANT (2026-01): IKA now owns XP + achievements.
+// Keep WatuPlay as an ASSET LIBRARY ONLY (icons/names) unless explicitly enabled.
+// To re-enable the bridge, add this in wp-config.php or via a must-use plugin:
+// define('IKA_ENABLE_WATUPLAY_MODAL_BRIDGE', true);
+if ( defined( 'IKA_ENABLE_WATUPLAY_MODAL_BRIDGE' ) && IKA_ENABLE_WATUPLAY_MODAL_BRIDGE ) {
+	IKA_WatuPlay_Modal_Bridge::init();
+}

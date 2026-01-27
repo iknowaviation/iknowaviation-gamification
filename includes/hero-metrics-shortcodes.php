@@ -7,6 +7,31 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Hero metrics strip shortcodes
  * ======================================================================*/
 
+// ----------------------------------------------------------------------
+// Safe meta helpers (avoid fatals if shared helpers are refactored later)
+// ----------------------------------------------------------------------
+if ( ! function_exists( 'ika_get_user_meta_int' ) ) {
+	function ika_get_user_meta_int( string $key, int $default = 0, int $user_id = 0 ) : int {
+		$user_id = $user_id ? $user_id : get_current_user_id();
+		$val = get_user_meta( $user_id, $key, true );
+		if ( $val === '' || $val === null ) {
+			return $default;
+		}
+		return (int) $val;
+	}
+}
+
+if ( ! function_exists( 'ika_get_user_meta_float' ) ) {
+	function ika_get_user_meta_float( string $key, float $default = 0.0, int $user_id = 0 ) : float {
+		$user_id = $user_id ? $user_id : get_current_user_id();
+		$val = get_user_meta( $user_id, $key, true );
+		if ( $val === '' || $val === null ) {
+			return $default;
+		}
+		return (float) $val;
+	}
+}
+
 /**
  * [ika_quizzes_completed]
  */
@@ -87,6 +112,9 @@ add_shortcode( 'ika_current_streak', 'ika_shortcode_current_streak' );
  */
 add_shortcode( 'ika_total_xp', function() {
 	if ( ! is_user_logged_in() ) return '0';
-	$xp = get_user_meta( get_current_user_id(), 'ika_total_xp', true );
-	return number_format_i18n( intval( $xp ) );
+	$user_id = (int) get_current_user_id();
+	$xp = function_exists( 'ika_get_total_xp_canonical' )
+		? ika_get_total_xp_canonical( $user_id )
+		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
+	return number_format_i18n( (int) $xp );
 });

@@ -92,35 +92,59 @@ add_shortcode( 'ika_recent_xp_earned', function ( $atts ) {
 		$where_finished = " AND {$finished_col} = 1 ";
 	}
 
-	// Quiz XP via WatuPRO points.
-	$sql_now = $wpdb->prepare(
-		"
-		SELECT COALESCE(SUM({$points_col}), 0)
-		FROM {$table}
-		WHERE user_id = %d
-		  {$where_finished}
-		  AND {$date_col} >= DATE_SUB(NOW(), INTERVAL %d DAY)
-		",
-		$user_id,
-		$days
-	);
+	/**
+	 * Quiz XP source of truth (Phase 1): IKA XP Ledger.
+	 *
+	 * We still keep a WatuPRO points fallback for older data, but the canonical
+	 * calculation should come from wp_..._ika_xp_ledger (source = quiz_attempt).
+	 */
+	$quiz_xp  = 0;
+	$quiz_now = 0;
+	$quiz_utc = 0;
+	$ledger_table = $wpdb->prefix . 'ika_xp_ledger';
+	$ledger_found = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $ledger_table ) );
+	if ( $ledger_found === $ledger_table ) {
+		$quiz_xp = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(xp), 0)
+			 FROM {$ledger_table}
+			 WHERE user_id = %d
+			   AND source = 'quiz_attempt'
+			   AND created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)",
+			$user_id,
+			$days
+		) );
+	}
 
-	$sql_utc = $wpdb->prepare(
-		"
-		SELECT COALESCE(SUM({$points_col}), 0)
-		FROM {$table}
-		WHERE user_id = %d
-		  {$where_finished}
-		  AND {$date_col} >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
-		",
-		$user_id,
-		$days
-	);
+	// Fallback (legacy): Quiz XP via WatuPRO points.
+	if ( $quiz_xp <= 0 ) {
+		$sql_now = $wpdb->prepare(
+			"
+			SELECT COALESCE(SUM({$points_col}), 0)
+			FROM {$table}
+			WHERE user_id = %d
+			  {$where_finished}
+			  AND {$date_col} >= DATE_SUB(NOW(), INTERVAL %d DAY)
+			",
+			$user_id,
+			$days
+		);
 
-	$quiz_now = (int) $wpdb->get_var( $sql_now );
-	$quiz_utc = (int) $wpdb->get_var( $sql_utc );
+		$sql_utc = $wpdb->prepare(
+			"
+			SELECT COALESCE(SUM({$points_col}), 0)
+			FROM {$table}
+			WHERE user_id = %d
+			  {$where_finished}
+			  AND {$date_col} >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL %d DAY)
+			",
+			$user_id,
+			$days
+		);
 
-	$quiz_xp = max( $quiz_now, $quiz_utc );
+		$quiz_now = (int) $wpdb->get_var( $sql_now );
+		$quiz_utc = (int) $wpdb->get_var( $sql_utc );
+		$quiz_xp  = max( $quiz_now, $quiz_utc );
+	}
 
 	// Bonus XP (missions) via ledger if available.
 	$bonus_xp = 0;

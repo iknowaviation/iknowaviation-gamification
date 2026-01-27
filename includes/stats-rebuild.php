@@ -39,10 +39,15 @@ function ika_rebuild_stats_for_user( $user_id ) {
 		update_user_meta( $user_id, 'ika_best_score', 0 );
 		update_user_meta( $user_id, 'ika_total_xp_quiz', 0 );
 
-		// Preserve bonus XP (missions, promos, etc.) even if no attempts exist.
-		$bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
-		$bonus_xp = max( 0, $bonus_xp );
-		update_user_meta( $user_id, 'ika_total_xp', $bonus_xp );
+		// XP is canonical from the IKA XP ledger (quiz + bonus sources).
+		$bd = function_exists('ika_get_xp_breakdown_from_ledger') ? ika_get_xp_breakdown_from_ledger( $user_id ) : array('quiz'=>0,'bonus'=>0,'total'=>0);
+		update_user_meta( $user_id, 'ika_total_xp_quiz', (int) $bd['quiz'] );
+		update_user_meta( $user_id, 'ika_total_xp_bonus', (int) $bd['bonus'] );
+		update_user_meta( $user_id, 'ika_total_xp', (int) $bd['total'] );
+
+// Clean up legacy keys that should not be used for XP anymore.
+		delete_user_meta( $user_id, 'ika_xp_total' );
+		delete_user_meta( $user_id, 'ika_xp_bonus_ledger' );
 		update_user_meta( $user_id, 'ika_current_streak_days', 0 );
 		update_user_meta( $user_id, 'ika_last_quiz_date', '' );
 		update_user_meta( $user_id, 'ika_last_quiz_timestamp', 0 );
@@ -104,10 +109,15 @@ function ika_rebuild_stats_for_user( $user_id ) {
 	update_user_meta( $user_id, 'ika_total_xp_quiz', $quiz_xp_total );
 
 	// Preserve bonus XP (missions, promos, etc.)
-	$bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
-	$bonus_xp = max( 0, $bonus_xp );
-	$total_xp = (int) $quiz_xp_total + $bonus_xp;
-	update_user_meta( $user_id, 'ika_total_xp', $total_xp );
+	// XP is canonical from the IKA XP ledger (quiz + bonus sources).
+	$bd = function_exists('ika_get_xp_breakdown_from_ledger') ? ika_get_xp_breakdown_from_ledger( $user_id ) : array('quiz'=> (int) $quiz_xp_total, 'bonus'=>0, 'total'=> (int) $quiz_xp_total );
+	update_user_meta( $user_id, 'ika_total_xp_quiz', (int) $bd['quiz'] );
+	update_user_meta( $user_id, 'ika_total_xp_bonus', (int) $bd['bonus'] );
+	update_user_meta( $user_id, 'ika_total_xp', (int) $bd['total'] );
+
+// Clean up legacy keys that should not be used for XP anymore.
+	delete_user_meta( $user_id, 'ika_xp_total' );
+	delete_user_meta( $user_id, 'ika_xp_bonus_ledger' );
 	update_user_meta( $user_id, 'ika_current_streak_days', $streak_days );
 	update_user_meta( $user_id, 'ika_last_quiz_date', $last_quiz_date );
 	update_user_meta( $user_id, 'ika_last_quiz_timestamp', $last_quiz_ts );

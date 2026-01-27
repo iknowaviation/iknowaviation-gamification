@@ -108,6 +108,32 @@ function ika_gam_register_admin_menu() {
         'ika-gam-stats-rebuild',
         'ika_render_stats_rebuild_page'
     );
+
+    // "Achievements" submenu (Option C: IKA-owned achievements).
+    // Renderer lives in includes/ika-achievements.php. If that file wasn't loaded (partial upload,
+    // duplicate plugin folders, etc.), calling the function directly would fatal.
+    // Use a closure to fail gracefully and provide a useful admin message.
+    add_submenu_page(
+        'ika-gamification',
+        'Achievements',
+        'Achievements',
+        'manage_options',
+        'ika-gam-achievements',
+        function () {
+            if ( function_exists( 'ika_gam_render_achievements_page' ) ) {
+                ika_gam_render_achievements_page();
+                return;
+            }
+
+            echo '<div class="wrap">';
+            echo '<h1>Achievements</h1>';
+            echo '<div class="notice notice-error"><p><strong>Achievements module not loaded.</strong> The admin page callback <code>ika_gam_render_achievements_page()</code> is missing.</p>';
+            echo '<p>This usually means either (1) <code>includes/ika-achievements.php</code> is missing on the server, or (2) a second copy of the plugin is installed and the wrong one is active.</p>';
+            echo '<p>Fix: confirm <code>wp-content/plugins/iknowaviation-gamification/includes/ika-achievements.php</code> exists, then deactivate/reactivate the plugin.</p>';
+            echo '</div>';
+            echo '</div>';
+        }
+    );
 }
 
 /* ----------------------------------------------------------------------

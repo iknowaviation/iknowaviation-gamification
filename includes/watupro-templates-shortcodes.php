@@ -98,7 +98,8 @@ add_shortcode( 'ika_watu_results_shell', function( $atts = array() ) {
 		}
 	}
 
-	return ika_watu_template_render( 'results-shell.html', array(
+	// Render the results template.
+	$html = ika_watu_template_render( 'results-shell.html', array(
 		'user_name'  => $atts['user_name'],
 		'quiz_name'  => $atts['quiz_name'],
 		'correct'    => $atts['correct'],
@@ -109,6 +110,10 @@ add_shortcode( 'ika_watu_results_shell', function( $atts = array() ) {
 		'points'     => $atts['points'],
 		'avg_points' => $atts['avg_points'],
 	) );
+
+	// IMPORTANT: allow nested shortcodes inside the template to render.
+	// (e.g. [ika_achievement_modal] on results-shell.html)
+	return do_shortcode( $html );
 } );
 
 /**

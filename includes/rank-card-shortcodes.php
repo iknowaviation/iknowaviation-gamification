@@ -20,7 +20,9 @@ function ika_fd_get_rank_context( $user_id = 0 ) {
 		return null;
 	}
 
-	$xp      = floatval( get_user_meta( $user_id, 'ika_total_xp', true ) );
+	$xp      = function_exists( 'ika_get_total_xp_canonical' )
+		? (float) ika_get_total_xp_canonical( (int) $user_id )
+		: floatval( get_user_meta( $user_id, 'ika_total_xp', true ) );
 	$ladder  = ika_get_rank_ladder();
 	$current = ika_get_rank_for_xp( $xp );
 	$next    = ika_get_next_rank_for_xp( $xp );
@@ -82,7 +84,11 @@ add_shortcode( 'ika_rank_title', function() {
 if ( ! shortcode_exists( 'ika_total_xp' ) ) {
 	add_shortcode( 'ika_total_xp', function() {
 		if ( ! is_user_logged_in() ) return '0';
-		return (string) intval( get_user_meta( get_current_user_id(), 'ika_total_xp', true ) );
+		$user_id = (int) get_current_user_id();
+		$xp = function_exists( 'ika_get_total_xp_canonical' )
+			? ika_get_total_xp_canonical( $user_id )
+			: (int) get_user_meta( $user_id, 'ika_total_xp', true );
+		return (string) intval( $xp );
 	});
 }
 
@@ -144,6 +150,22 @@ add_shortcode( 'ika_xp_level_goal', function() {
 	if ( ! $ctx ) return '0';
 	return intval( $ctx['level_xp_goal'] );
 });
+
+
+/**
+ * [ika_xp_progress_toward_next]
+ * Label used inside the progress bar on Flight Deck.
+ * Returns the XP earned inside the *current* rank range.
+ * Example: "64 XP earned"
+ */
+if ( ! shortcode_exists( 'ika_xp_progress_toward_next' ) ) {
+	add_shortcode( 'ika_xp_progress_toward_next', function() {
+		$ctx = ika_fd_get_rank_context();
+		if ( ! $ctx ) return '';
+		return esc_html( intval( $ctx['level_xp_earned'] ) . ' XP earned' );
+	});
+}
+
 
 /**
  * ✅ NEW: [ika_next_rank_progress]
