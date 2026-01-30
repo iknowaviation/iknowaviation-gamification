@@ -109,7 +109,18 @@ function ika_gam_register_admin_menu() {
         'ika_render_stats_rebuild_page'
     );
 
-    // "Achievements" submenu (Option C: IKA-owned achievements).
+    
+    // "User Reset Tools" submenu (admin-only test utilities).
+    add_submenu_page(
+        'ika-gamification',
+        'User Reset Tools',
+        'User Reset Tools',
+        'manage_options',
+        'ika-gam-user-reset-tools',
+        'ika_gam_admin_user_reset_tools_page'
+    );
+
+// "Achievements" submenu (Option C: IKA-owned achievements).
     // Renderer lives in includes/ika-achievements.php. If that file wasn't loaded (partial upload,
     // duplicate plugin folders, etc.), calling the function directly would fatal.
     // Use a closure to fail gracefully and provide a useful admin message.

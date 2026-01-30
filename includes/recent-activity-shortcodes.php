@@ -46,7 +46,11 @@ if ( ! function_exists( 'ika_fd_get_recent_activity_items' ) ) {
 			$exam_id = (int) ( $a->exam_id ?? 0 );
 			$pct     = isset( $a->percent_correct ) ? (int) round( (float) $a->percent_correct ) : 0;
 			$taking_id = (int) ( $a->taking_id ?? 0 );
-			$xp = function_exists( 'ika_xp_for_taking' ) ? (int) ika_xp_for_taking( $taking_id ) : ( isset( $a->points ) ? (int) $a->points : 0 );
+
+			// Ledger-only: prefer total + breakdown tied to this attempt.
+			$bd = function_exists( 'ika_xp_breakdown_for_taking' ) ? ika_xp_breakdown_for_taking( $taking_id ) : array();
+			$xp = isset( $bd['total'] ) ? (int) $bd['total'] : ( function_exists( 'ika_xp_for_taking' ) ? (int) ika_xp_for_taking( $taking_id ) : ( isset( $a->points ) ? (int) $a->points : 0 ) );
+			$bonus_label = isset( $bd['bonus_label'] ) ? (string) $bd['bonus_label'] : '';
 
 			$post_id = function_exists( 'ika_fd_get_quiz_post_id_by_exam_id' ) ? ika_fd_get_quiz_post_id_by_exam_id( $exam_id ) : 0;
 			$title   = $post_id ? get_the_title( $post_id ) : ( 'Quiz #' . $exam_id );
@@ -56,41 +60,14 @@ if ( ! function_exists( 'ika_fd_get_recent_activity_items' ) ) {
 				'ts'    => $ts,
 				'type'  => 'quiz',
 				'title' => (string) $title,
-				'meta'  => sprintf( '%d%% score', $pct ),
+				'meta'  => trim( sprintf( '%d%% score', $pct ) ),
 				'xp'    => $xp,
+				'xp_note' => $bonus_label,
 				'url'   => (string) $url,
 			];
 		}
 
-		// 2) Mission bonus ledger (user meta)
-		if ( function_exists( 'ika_xp_bonus_get_ledger' ) ) {
-			$ledger = (array) ika_xp_bonus_get_ledger( $user_id );
-			// Iterate from newest to oldest to avoid sorting large ledgers.
-			for ( $i = count( $ledger ) - 1; $i >= 0; $i-- ) {
-				$row = $ledger[ $i ];
-				$ts  = isset( $row['ts'] ) ? (int) $row['ts'] : 0;
-				if ( $ts <= 0 ) continue;
-				if ( $ts < $cutoff ) break; // ledger is chronological
-
-				$amount = isset( $row['amount'] ) ? (int) $row['amount'] : 0;
-				$reason = isset( $row['reason'] ) ? (string) $row['reason'] : '';
-				if ( $amount === 0 ) continue;
-
-				$items[] = [
-					'ts'    => $ts,
-					'type'  => 'bonus',
-					'title' => 'Mission bonus',
-					'meta'  => $reason !== '' ? $reason : 'Bonus XP earned',
-					'xp'    => $amount,
-					'url'   => '',
-				];
-
-				// Soft stop once we have plenty; we'll sort + slice below.
-				if ( count( $items ) >= ( $limit * 10 ) ) {
-					break;
-				}
-			}
-		}
+		// NOTE: Option 1 (contract): related bonuses are folded into the quiz attempt row.
 
 		// Sort newest-first.
 		usort( $items, function( $a, $b ) {
@@ -138,8 +115,12 @@ add_shortcode( 'ika_fd_recent_activity', function( $atts ) {
 				$xp   = (int) ( $it['xp'] ?? 0 );
 				$url  = (string) ( $it['url'] ?? '' );
 				$time_ago = function_exists( 'ika_fd_time_ago' ) ? ika_fd_time_ago( $ts ) : '';
+				$xp_note = (string) ( $it['xp_note'] ?? '' );
 				$xp_label = $xp !== 0 ? ( ( $xp > 0 ? '+' : '' ) . number_format_i18n( $xp ) . ' XP' ) : '';
-				$icon = $type === 'bonus' ? 'fa-bullseye' : 'fa-clipboard-check';
+				if ( $xp_label && $xp_note !== '' ) {
+					$xp_label .= ' (' . $xp_note . ')';
+				}
+				$icon = 'fa-clipboard-check';
 			?>
 			<li class="ika-fd-activity-item is-<?php echo esc_attr( $type ); ?>">
 				<div class="ika-fd-activity-row">

@@ -70,12 +70,22 @@ function ika_fd_get_rank_context( $user_id = 0 ) {
 
 /**
  * [ika_rank_title]
+ * Ledger-first via rank context (avoids legacy meta fallbacks).
  */
 add_shortcode( 'ika_rank_title', function() {
-	if ( ! is_user_logged_in() ) return '';
-	$data = ika_get_user_xp_and_rank();
-	return $data ? esc_html( $data['rank_label'] ) : '';
+	$ctx = ika_fd_get_rank_context();
+	if ( ! $ctx ) return '';
+	return esc_html( (string) $ctx['rank_label'] );
 });
+
+// Back-compat alias (in case older pages used hyphens).
+if ( ! shortcode_exists( 'ika-rank-title' ) ) {
+	add_shortcode( 'ika-rank-title', function() {
+		$ctx = ika_fd_get_rank_context();
+		if ( ! $ctx ) return '';
+		return esc_html( (string) $ctx['rank_label'] );
+	});
+}
 
 /**
  * [ika_total_xp]

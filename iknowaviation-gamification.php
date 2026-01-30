@@ -127,6 +127,10 @@ ika_gam_safe_require( 'includes/ika-achievements-admin.php' );
 ika_gam_safe_require( 'includes/admin-debug-panel.php' );
 ika_gam_safe_require( 'includes/admin-menu-settings.php' );
 ika_gam_safe_require( 'includes/admin-tools-shortcodes.php' );
+ika_gam_safe_require( 'includes/admin-user-reset-tools.php' );
+
+// Step 3: Legacy bonus → ledger migration (admin-only)
+ika_gam_safe_require( 'includes/tools/class-ika-xp-legacy-bonus-migration.php' );
 
 /**
  * Flight Deck — Recommended Next

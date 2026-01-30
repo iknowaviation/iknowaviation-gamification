@@ -137,7 +137,8 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
                         'url'      => $url,
                         'score'    => sprintf( '%d%%', (int) round( $pct ) ),
                         'attempts' => (string) ( $counts[ $exam_id ] ?? 1 ),
-                        'xp'       => ( isset( $a->points ) ? ( '+' . ( function_exists('ika_xp_for_taking') ? ika_xp_for_taking( (int)($a->taking_id ?? 0) ) : intval( $a->points ) ) ) : '' ),
+					'taking_id' => (int) ( $a->taking_id ?? 0 ),
+					'xp'       => '',
                         'status'   => $is_complete ? 'Completed' : 'In Progress',
                         'status_key'   => $is_complete ? 'completed' : 'in_progress',
                         'status_class' => $is_complete ? 'is-complete' : 'is-started',
@@ -146,6 +147,22 @@ add_shortcode( 'ika_fd_flightlog_preview', function( $atts ) {
                         'date'     => function_exists( 'ika_fd_format_attempt_date' ) ? ika_fd_format_attempt_date( $a->end_time ) : '',
                     ];
                 }
+
+			// Fill XP display (ledger-only; full attempt XP).
+			foreach ( $rows as &$r ) {
+				$taking_id = (int) ( $r['taking_id'] ?? 0 );
+				$xp = 0;
+				if ( $taking_id > 0 && function_exists( 'ika_xp_breakdown_for_taking' ) ) {
+					$bd = ika_xp_breakdown_for_taking( $taking_id );
+					$xp = (int) ( $bd['total'] ?? 0 );
+				} elseif ( $taking_id > 0 && function_exists( 'ika_xp_for_taking' ) ) {
+					$xp = (int) ika_xp_for_taking( $taking_id );
+				}
+				if ( $xp !== 0 ) {
+					$r['xp'] = ( $xp > 0 ? '+' : '' ) . number_format_i18n( $xp );
+				}
+			}
+			unset( $r );
             }
 
             $rows = array_slice( $rows, 0, $limit );

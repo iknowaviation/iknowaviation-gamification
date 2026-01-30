@@ -146,6 +146,22 @@
   $(function(){
     ensureContainer();
 
+    // Listen for any jQuery UI dialog opens (Watu/WatuPlay often opens after DOM ready).
+    // Close immediately so users never see the foreign modal flash.
+    $(document).on('dialogopen', '.ui-dialog-content', function(){
+      try{
+        var $el = $(this);
+        if ($el.attr('id') === 'ika-achievements-modal') return;
+        var id = String($el.attr('id') || '').toLowerCase();
+        var cls = String($el.attr('class') || '').toLowerCase();
+        if (id.indexOf('watu') !== -1 || cls.indexOf('watu') !== -1 || cls.indexOf('watuplay') !== -1) {
+          try { $el.dialog('close'); } catch(e) {}
+          $el.hide();
+        }
+      }catch(e){}
+    });
+
+
     // If WatuPlay (or another plugin) opens its own modal on results pages,
     // close it immediately so the IKA modal is the only one users see.
     closeForeignAchievementDialogs();

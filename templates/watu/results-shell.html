@@ -11,6 +11,8 @@
 
 <!-- MAIN BODY -->
 <div class="ika-results-main">
+  <!-- Hidden: used by Daily Missions AJAX to tie bonuses to this attempt -->
+  <span id="ika-taking-id" data-taking-id="{{taking_id}}" aria-hidden="true" style="display:none"></span>
   <!-- STATS (Option B: Gamified) -->
   <div class="ika-stats-grid">
     <div class="ika-stat-card">
@@ -20,16 +22,20 @@
     </div>
 
     <div class="ika-stat-card">
-      <div class="ika-stat-label">XP earned</div>
-      <div class="ika-stat-value"><span>{{xp_earned}}</span></div>
-      <div class="ika-stat-mini">Added to your XP total.</div>
+      <div class="ika-stat-label">Total XP earned</div>
+      <div class="ika-stat-value"><span>{{xp_total}}</span></div>
+      <div class="ika-stat-mini">
+        Quiz XP: <strong>{{xp_quiz}}</strong> &nbsp;•&nbsp; Bonus XP: <strong>{{xp_bonus}}</strong>
+        <span class="ika-stat-tip" title="XP includes any bonuses triggered by this completion.">ⓘ</span>
+        {{xp_bonus_label}}
+      </div>
     </div>
 
     <div class="ika-stat-card">
       <div class="ika-stat-label">Rank progress</div>
       <div class="ika-stat-value"><span>[ika_rank_title]</span></div>
       <div class="ika-stat-mini">
-        Total XP: <strong>[ika_total_xp]</strong><br>
+        Total XP: <strong>[ika_total_xp]</strong> <span class="ika-stat-tip" title="Total XP includes quiz XP plus any bonus XP you've earned.">ⓘ</span><br>
         <span class="ika-rank-progress">[ika_next_rank_progress]</span>
       </div>
     </div>

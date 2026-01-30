@@ -78,6 +78,195 @@ function ika_xp_for_taking( int $taking_id ) : int {
 }
 }
 
+/* ======================================================================
+ * Ledger helpers (bonuses + breakdown)
+ * ======================================================================*/
+
+if ( ! function_exists( 'ika_xp_ledger_add_row' ) ) {
+	/**
+	 * Insert an XP row into the SQL ledger.
+	 *
+	 * Notes:
+	 * - Uses INSERT IGNORE with UNIQUE(taking_id, source) for idempotency.
+	 * - For bonus rows tied to a quiz completion, pass the attempt's taking_id.
+	 * - $meta is stored as JSON.
+	 */
+	function ika_xp_ledger_add_row( int $user_id, int $exam_id, int $taking_id, int $xp, string $source, array $meta = array() ) : void {
+		global $wpdb;
+
+		$user_id  = (int) $user_id;
+		$exam_id  = (int) $exam_id;
+		$taking_id= (int) $taking_id;
+		$xp       = (int) $xp;
+		$source   = sanitize_key( $source );
+
+		if ( $user_id <= 0 || $xp === 0 ) {
+			return;
+		}
+
+		$table = ika_xp_ledger_table();
+		$meta_json = ! empty( $meta ) ? wp_json_encode( $meta ) : null;
+
+		$wpdb->query( $wpdb->prepare(
+			"INSERT IGNORE INTO {$table} (user_id, exam_id, taking_id, xp, source, meta) VALUES (%d, %d, %d, %d, %s, %s)",
+			$user_id,
+			$exam_id,
+			$taking_id,
+			$xp,
+			$source,
+			$meta_json
+		) );
+	}
+}
+
+if ( ! function_exists( 'ika_xp_ledger_try_attach_recent_mission_bonuses' ) ) {
+	/**
+	 * Best-effort repair: attach recent untied mission bonus rows to a specific quiz attempt.
+	 *
+	 * Why: Older completions may have awarded mission bonus XP with taking_id=0 (untied),
+	 * which prevents the Results breakdown + Recent Activity (Option 1) from folding bonuses.
+	 *
+	 * Safety rails:
+	 * - Only touches rows where taking_id=0 and source LIKE 'mission_bonus%'
+	 * - Only within a tight time window around the attempt end_time
+	 * - Only attaches a small number of rows (<= 3) and a small total XP (<= 25)
+	 */
+	function ika_xp_ledger_try_attach_recent_mission_bonuses( int $user_id, int $taking_id ) : void {
+		global $wpdb;
+		$user_id  = (int) $user_id;
+		$taking_id = (int) $taking_id;
+		if ( $user_id <= 0 || $taking_id <= 0 ) return;
+
+		$table = ika_xp_ledger_table();
+		$taken_tbl = $wpdb->prefix . 'watupro_taken_exams';
+
+		// Get attempt end_time + exam_id.
+		$row = $wpdb->get_row( $wpdb->prepare(
+			"SELECT exam_id, end_time FROM {$taken_tbl} WHERE ID = %d AND user_id = %d LIMIT 1",
+			$taking_id,
+			$user_id
+		) );
+		if ( ! $row ) return;
+		$exam_id = (int) ( $row->exam_id ?? 0 );
+		$end_time = (string) ( $row->end_time ?? '' );
+		if ( $end_time === '' ) return;
+
+		// Tight window: from 2 minutes before end_time to 15 minutes after.
+		$ids = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, xp FROM {$table}
+			 WHERE user_id = %d
+			   AND taking_id = 0
+			   AND source LIKE %s
+			   AND created_at BETWEEN (DATE_SUB(%s, INTERVAL 2 MINUTE)) AND (DATE_ADD(%s, INTERVAL 15 MINUTE))
+			 ORDER BY created_at ASC
+			 LIMIT 5",
+			$user_id,
+			'mission_bonus%',
+			$end_time,
+			$end_time
+		) );
+		if ( empty( $ids ) ) return;
+
+		$xp_total = 0;
+		$id_list = [];
+		foreach ( $ids as $r ) {
+			$id_list[] = (int) $r->id;
+			$xp_total += (int) ( $r->xp ?? 0 );
+		}
+		// Safety: do not attach if it looks like more than our missions.
+		if ( count( $id_list ) > 3 ) return;
+		if ( $xp_total > 25 ) return;
+
+		$id_sql = implode( ',', array_map( 'intval', $id_list ) );
+		// Attach to this attempt.
+		$wpdb->query( $wpdb->prepare(
+			"UPDATE {$table}
+			 SET taking_id = %d, exam_id = %d
+			 WHERE user_id = %d AND id IN ({$id_sql})",
+			$taking_id,
+			$exam_id,
+			$user_id
+		) );
+
+		// Keep cached totals consistent after attaching rows.
+		if ( function_exists( 'ika_xp_sync_user_cache_from_ledger' ) ) {
+			ika_xp_sync_user_cache_from_ledger( $user_id );
+		} elseif ( function_exists( 'ika_get_total_xp_canonical' ) ) {
+			ika_get_total_xp_canonical( $user_id, true );
+		}
+	}
+}
+
+if ( ! function_exists( 'ika_xp_breakdown_for_taking' ) ) {
+	/**
+	 * Return a breakdown of XP for a specific attempt.
+	 *
+	 * @return array{quiz:int, bonus:int, total:int, bonus_label:string}
+	 */
+	function ika_xp_breakdown_for_taking( int $taking_id ) : array {
+		global $wpdb;
+		$taking_id = (int) $taking_id;
+		if ( $taking_id <= 0 ) {
+			return array( 'quiz' => 0, 'bonus' => 0, 'total' => 0, 'bonus_label' => '' );
+		}
+
+		$table = ika_xp_ledger_table();
+
+		$quiz = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE taking_id = %d AND source = %s",
+			$taking_id,
+			'quiz_attempt'
+		) );
+
+		$bonus = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(xp),0) FROM {$table} WHERE taking_id = %d AND source <> %s",
+			$taking_id,
+			'quiz_attempt'
+		) );
+
+		// Friendly bonus label (currently: mission bonus).
+		$bonus_label = '';
+		if ( $bonus !== 0 ) {
+			$has_mission = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(1) FROM {$table} WHERE taking_id = %d AND source LIKE %s",
+				$taking_id,
+				'mission_bonus%'
+			) );
+			if ( $has_mission > 0 ) {
+				$bonus_label = 'includes +' . number_format_i18n( abs( $bonus ) ) . ' mission bonus';
+			} else {
+				$bonus_label = 'includes bonuses';
+			}
+		}
+
+		return array(
+			'quiz' => $quiz,
+			'bonus' => $bonus,
+			'total' => (int) ( $quiz + $bonus ),
+			'bonus_label' => $bonus_label,
+		);
+	}
+}
+
+if ( ! function_exists( 'ika_xp_sync_user_cache_from_ledger' ) ) {
+	/**
+	 * Update cached usermeta totals from the SQL ledger.
+	 *
+	 * Keeps the site fast while preserving ledger-only truth.
+	 */
+	function ika_xp_sync_user_cache_from_ledger( int $user_id ) : void {
+		$user_id = (int) $user_id;
+		if ( $user_id <= 0 ) return;
+
+		if ( ! function_exists( 'ika_get_xp_breakdown_from_ledger' ) ) return;
+		$bd = ika_get_xp_breakdown_from_ledger( $user_id, null );
+
+		update_user_meta( $user_id, 'ika_total_xp_quiz', (int) ( $bd['quiz'] ?? 0 ) );
+		update_user_meta( $user_id, 'ika_total_xp_bonus', (int) ( $bd['bonus'] ?? 0 ) );
+		update_user_meta( $user_id, 'ika_total_xp', (int) ( $bd['total'] ?? 0 ) );
+	}
+}
+
 /**
  * Calculate XP for a Watu attempt.
  *

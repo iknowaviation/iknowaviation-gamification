@@ -110,29 +110,42 @@ function ika_dm_save_state( $user_id, $state ) {
 /**
  * Add XP to the user (separate from Watu Play internal points).
  */
-function ika_dm_add_xp( $user_id, $xp, $reason = "" ) {
+function ika_dm_add_xp( $user_id, $xp, $reason = "", $taking_id = 0 ) {
     $xp = (int) $xp;
     if ( $xp <= 0 ) {
         return;
     }
 
-    // Bonus XP from missions should NOT be overwritten by stats rebuilds.
-    // We store it separately and then keep ika_total_xp in sync.
-    $bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
-    $bonus = max( 0, $bonus + $xp );
-    update_user_meta( $user_id, 'ika_total_xp_bonus', $bonus );
-	// Record bonus award in ledger (if available)
-	if ( function_exists( 'ika_xp_bonus_add' ) ) {
-		ika_xp_bonus_add( (int) $user_id, (int) $xp, (string) $reason );
-	}
-	// Sync canonical totals (quiz XP from ledger + bonus XP).
-	if ( function_exists( 'ika_get_total_xp_canonical' ) ) {
-		ika_get_total_xp_canonical( (int) $user_id, true );
-	} else {
-		$quiz_xp  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
-		$total_xp = max( 0, $quiz_xp + $bonus );
-		update_user_meta( $user_id, 'ika_total_xp', $total_xp );
-	}
+    // Ledger-only bonus XP.
+    // Tie the bonus to the quiz attempt when possible (taking_id) so Results + Recent Activity
+    // can display a clean breakdown.
+    $taking_id = (int) $taking_id;
+    $exam_id = 0;
+    if ( $taking_id > 0 ) {
+        global $wpdb;
+        $taken_tbl = $wpdb->prefix . 'watupro_taken_exams';
+        $exam_id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT exam_id FROM {$taken_tbl} WHERE ID = %d LIMIT 1", $taking_id ) );
+    }
+
+    if ( function_exists( 'ika_xp_ledger_add_row' ) ) {
+        $source = 'mission_bonus';
+        // Safety: UNIQUE(taking_id, source) would collide globally when taking_id=0.
+        // If we cannot tie to an attempt, generate a unique source key.
+        if ( $taking_id <= 0 ) {
+            $source = 'mission_bonus_' . substr( md5( uniqid( 'ika', true ) ), 0, 8 );
+        }
+        ika_xp_ledger_add_row( (int) $user_id, (int) $exam_id, (int) $taking_id, (int) $xp, $source, array(
+            'reason' => sanitize_text_field( (string) $reason ),
+            'tied_to_attempt' => $taking_id > 0 ? 1 : 0,
+        ) );
+    }
+
+    // Refresh cached totals from ledger.
+    if ( function_exists( 'ika_xp_sync_user_cache_from_ledger' ) ) {
+        ika_xp_sync_user_cache_from_ledger( (int) $user_id );
+    } elseif ( function_exists( 'ika_get_total_xp_canonical' ) ) {
+        ika_get_total_xp_canonical( (int) $user_id, true );
+    }
 }
 
 /**
@@ -186,7 +199,7 @@ function ika_dm_update_streak( $user_id ) {
  * @param int   $user_id
  * @param float $percentage  Quiz final percentage score (0–100).
  */
-function ika_dm_update_on_completion( $user_id, $percentage ) {
+function ika_dm_update_on_completion( $user_id, $percentage, $taking_id = 0 ) {
     $missions = ika_dm_get_missions_config();
     $state    = ika_dm_get_state( $user_id );
     $changed  = false;
@@ -213,7 +226,7 @@ function ika_dm_update_on_completion( $user_id, $percentage ) {
                     $mstate['progress']  = (int) $mission['target'];
                     $mstate['completed'] = true;
                     if ( ! empty( $mission['xp_reward'] ) ) {
-                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id );
+                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id, (int) $taking_id );
                     }
                 }
                 $changed = true;
@@ -225,7 +238,7 @@ function ika_dm_update_on_completion( $user_id, $percentage ) {
                     $mstate['progress']  = (int) $mission['target'];
                     $mstate['completed'] = true;
                     if ( ! empty( $mission['xp_reward'] ) ) {
-                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id );
+                        ika_dm_add_xp( $user_id, (int) $mission['xp_reward'], (string) $id, (int) $taking_id );
                     }
                     $changed = true;
                 }
@@ -259,8 +272,9 @@ function ika_dm_ajax_log_quiz_completion() {
 
     $user_id    = get_current_user_id();
     $percentage = isset( $_POST['percentage'] ) ? floatval( wp_unslash( $_POST['percentage'] ) ) : 0;
+	$taking_id  = isset( $_POST['taking_id'] ) ? absint( wp_unslash( $_POST['taking_id'] ) ) : 0;
 
-    ika_dm_update_on_completion( $user_id, $percentage );
+	ika_dm_update_on_completion( $user_id, $percentage, (int) $taking_id );
 
     wp_send_json_success();
 }
@@ -329,6 +343,17 @@ document.addEventListener('DOMContentLoaded', function() {
     formData.append('action', 'ika_log_quiz_completion');
     formData.append('nonce', window.ikaDailyMissions.nonce);
     formData.append('percentage', percent);
+
+    // Best-effort: tie mission bonus to this attempt (for Results breakdown + Recent Activity folding).
+    var takingEl = document.getElementById('ika-taking-id');
+    var takingId = takingEl ? parseInt(takingEl.getAttribute('data-taking-id') || '0', 10) : 0;
+    if (!takingId) {
+        var qs = new URLSearchParams(window.location.search);
+        takingId = parseInt(qs.get('watupro_taking_id') || '0', 10) || 0;
+    }
+    if (takingId) {
+        formData.append('taking_id', String(takingId));
+    }
 
     fetch(window.ikaDailyMissions.ajax_url, {
         method: 'POST',
@@ -412,7 +437,7 @@ function ika_dm_filter_get_avatar( $avatar, $id_or_email, $size, $default_value,
 
 	$xp    = function_exists( 'ika_get_total_xp_canonical' )
 		? (int) ika_get_total_xp_canonical( (int) $user_id )
-		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
+		: (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
     $level = ika_dm_get_level_from_xp( $xp );
 
     // Wrap avatar in a span so we can draw a ring + badge via CSS.
@@ -460,7 +485,7 @@ function ika_dm_shortcode_render() {
 
 	$xp_total       = function_exists( 'ika_get_total_xp_canonical' )
 		? (int) ika_get_total_xp_canonical( (int) $user_id )
-		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
+		: (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
     $streak_current = (int) get_user_meta( $user_id, 'ika_daily_streak', true );
     $streak_best    = (int) get_user_meta( $user_id, 'ika_best_streak', true );
     $level          = ika_dm_get_level_from_xp( $xp_total );
@@ -569,7 +594,7 @@ function ika_dm_shortcode_user_level( $atts = array() ) {
     $user_id = get_current_user_id();
 	$xp      = function_exists( 'ika_get_total_xp_canonical' )
 		? (int) ika_get_total_xp_canonical( (int) $user_id )
-		: (int) get_user_meta( $user_id, 'ika_total_xp', true );
+		: (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
     $level   = ika_dm_get_level_from_xp( $xp );
 
     if ( 'true' === strtolower( $atts['number_only'] ) ) {
@@ -724,7 +749,7 @@ add_shortcode( 'ika_dm_reset_today', function () {
 		update_user_meta( $user_id, 'ika_total_xp_bonus', $bonus );
 	}
 
-	$total = function_exists( 'ika_xp_recompute_total' ) ? ika_xp_recompute_total( $user_id ) : (int) get_user_meta( $user_id, 'ika_total_xp', true );
+	$total = function_exists( 'ika_xp_recompute_total' ) ? ika_xp_recompute_total( $user_id ) : (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
 
 	return 'Reset OK. Removed bonus=' . (int) $removed . ' XP. Total XP now=' . (int) $total . '.';
 } );
@@ -749,7 +774,7 @@ add_shortcode( 'ika_debug_xp_breakdown', function ( $atts ) {
 
 	$quiz  = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
 	$bonus = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
-	$total = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+	$total = (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
 
 	$bonus_recent = ika_xp_bonus_sum_since_days( $user_id, $days );
 

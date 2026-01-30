@@ -145,39 +145,42 @@ function ika_get_total_xp_canonical( $user_id = 0, $force_recompute = false ) : 
         return 0;
     }
 
-    $cached = get_user_meta( $user_id, 'ika_total_xp', true );
-    if ( ! $force_recompute && $cached !== '' && $cached !== null ) {
-        return max( 0, (int) $cached );
-    }
-
-    // Bonus XP (missions, promos, etc.)
-    $bonus_xp = (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true );
-    $bonus_xp = max( 0, $bonus_xp );
-
-    // Quiz XP from ledger
+    // Contract v1.0: Ledger is the only source of truth.
+    // We recompute from the ledger to avoid stale meta after direct DB edits/resets.
+    $total_xp = 0;
     $quiz_xp_total = 0;
+    $bonus_xp = 0;
+
     if ( function_exists( 'ika_xp_ledger_table' ) ) {
         global $wpdb;
         $ledger_table = ika_xp_ledger_table();
+
+        $total_xp = (int) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(xp),0) FROM {$ledger_table} WHERE user_id = %d",
+            $user_id
+        ) );
+
         $quiz_xp_total = (int) $wpdb->get_var( $wpdb->prepare(
             "SELECT COALESCE(SUM(xp),0) FROM {$ledger_table} WHERE user_id = %d AND source = %s",
             $user_id,
             'quiz_attempt'
         ) );
+
+        $bonus_xp = max( 0, (int) $total_xp - (int) $quiz_xp_total );
+    } else {
+        // Fallback: legacy cache (should be rare).
+        $total_xp = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+        $quiz_xp_total = (int) get_user_meta( $user_id, 'ika_total_xp_quiz', true );
+        $bonus_xp = max( 0, (int) get_user_meta( $user_id, 'ika_total_xp_bonus', true ) );
     }
 
-    $total_xp = (int) $quiz_xp_total + $bonus_xp;
-    $total_xp = max( 0, $total_xp );
+    $total_xp = max( 0, (int) $total_xp );
 
-    // Cache canonical totals.
+    // Keep cache/meta in sync with ledger for other UI consumers.
     update_user_meta( $user_id, 'ika_total_xp_quiz', (int) $quiz_xp_total );
-    update_user_meta( $user_id, 'ika_total_xp', $total_xp );
+    update_user_meta( $user_id, 'ika_total_xp_bonus', (int) $bonus_xp );
+    update_user_meta( $user_id, 'ika_total_xp', (int) $total_xp );
 
-    // Clean up legacy keys that can confuse debugging/UI.
-    // We do NOT touch Watu Play internal state (badges/levels) here.
-    delete_user_meta( $user_id, 'ika_xp_total' );
-    delete_user_meta( $user_id, 'ika_xp_bonus_ledger' );
-
-    return $total_xp;
+    return (int) $total_xp;
 }
 }

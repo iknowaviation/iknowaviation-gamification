@@ -88,13 +88,32 @@ add_shortcode( 'ika_watu_results_shell', function( $atts = array() ) {
 	);
 
 	// Default XP earned display: fallback to Watu points, but prefer ledger XP.
-	$xp_earned = (int) $atts['points'];
+	$xp_total = (int) $atts['points'];
+	$xp_quiz  = 0;
+	$xp_bonus = 0;
+	$xp_bonus_label = '';
 
 	$taking_id = ika_watu_current_taking_id();
-	if ( $taking_id > 0 && function_exists( 'ika_xp_for_taking' ) ) {
+	// Best-effort: if mission bonuses were awarded untied (taking_id=0) for this completion,
+	// attach them now so the Results breakdown and Recent Activity folding stay consistent.
+	if ( $taking_id > 0 && function_exists( 'ika_xp_ledger_try_attach_recent_mission_bonuses' ) ) {
+		$user_id_guess = get_current_user_id();
+		if ( $user_id_guess > 0 ) {
+			ika_xp_ledger_try_attach_recent_mission_bonuses( (int) $user_id_guess, (int) $taking_id );
+		}
+	}
+	if ( $taking_id > 0 && function_exists( 'ika_xp_breakdown_for_taking' ) ) {
+		$bd = ika_xp_breakdown_for_taking( $taking_id );
+		$xp_quiz  = (int) ( $bd['quiz'] ?? 0 );
+		$xp_bonus = (int) ( $bd['bonus'] ?? 0 );
+		$xp_total = (int) ( $bd['total'] ?? 0 );
+		$xp_bonus_label = (string) ( $bd['bonus_label'] ?? '' );
+	} elseif ( $taking_id > 0 && function_exists( 'ika_xp_for_taking' ) ) {
+		// Back-compat: quiz-only XP.
 		$ledger_xp = (int) ika_xp_for_taking( $taking_id );
 		if ( $ledger_xp > 0 ) {
-			$xp_earned = $ledger_xp;
+			$xp_quiz  = $ledger_xp;
+			$xp_total = $ledger_xp;
 		}
 	}
 
@@ -106,7 +125,11 @@ add_shortcode( 'ika_watu_results_shell', function( $atts = array() ) {
 		'total'      => $atts['total'],
 		'percentage' => $atts['percentage'],
 		'grade'      => $atts['grade'],
-		'xp_earned'  => (string) $xp_earned,
+		'taking_id'  => (string) $taking_id,
+		'xp_total'   => (string) $xp_total,
+		'xp_quiz'    => (string) $xp_quiz,
+		'xp_bonus'   => (string) $xp_bonus,
+		'xp_bonus_label' => (string) $xp_bonus_label,
 		'points'     => $atts['points'],
 		'avg_points' => $atts['avg_points'],
 	) );

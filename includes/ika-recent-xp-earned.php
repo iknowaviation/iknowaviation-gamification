@@ -146,10 +146,18 @@ add_shortcode( 'ika_recent_xp_earned', function ( $atts ) {
 		$quiz_xp  = max( $quiz_now, $quiz_utc );
 	}
 
-	// Bonus XP (missions) via ledger if available.
+	// Bonus XP (ledger-only): sum all non-quiz_attempt sources over the window.
 	$bonus_xp = 0;
-	if ( function_exists( 'ika_xp_bonus_sum_since_days' ) ) {
-		$bonus_xp = (int) ika_xp_bonus_sum_since_days( (int) $user_id, (int) $days );
+	if ( $ledger_found === $ledger_table ) {
+		$bonus_xp = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COALESCE(SUM(xp), 0)
+			 FROM {$ledger_table}
+			 WHERE user_id = %d
+			   AND source <> 'quiz_attempt'
+			   AND created_at >= DATE_SUB(NOW(), INTERVAL %d DAY)",
+			$user_id,
+			$days
+		) );
 	}
 
 	$total = (int) $quiz_xp + (int) $bonus_xp;

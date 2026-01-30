@@ -389,7 +389,7 @@ add_shortcode( 'ika_fd_levels_preview', function( $atts ) {
         <?php else : ?>
             <?php
                 $user_id = get_current_user_id();
-                $xp      = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+                $xp      = (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
 
                 $icon_map = function_exists( 'ika_fd_watuproplay_icon_map' ) ? ika_fd_watuproplay_icon_map() : [];
 
@@ -679,7 +679,7 @@ add_shortcode( 'ika_fd_badges_page', function( $atts ) {
     }
 
     $user_id = get_current_user_id();
-    $xp      = (int) get_user_meta( $user_id, 'ika_total_xp', true );
+    $xp      = (int) ( function_exists('ika_get_total_xp_canonical') ? ika_get_total_xp_canonical( (int) $user_id ) : get_user_meta( $user_id, 'ika_total_xp', true ) );
 
     // Pull WatuPRO Play awards (both levels and badges) + icon map.
     $icon_map = ika_fd_watuproplay_icon_map();

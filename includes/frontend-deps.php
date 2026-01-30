@@ -313,3 +313,10 @@ add_action( 'wp_enqueue_scripts', function () {
 	}
 
 }, 20 );
+
+
+// IKA XP Debug tool (admin-only, read-only)
+$ika_xp_debug_path = plugin_dir_path( __FILE__ ) . 'debug/class-ika-xp-debug.php';
+if ( file_exists( $ika_xp_debug_path ) ) {
+    require_once $ika_xp_debug_path;
+}
